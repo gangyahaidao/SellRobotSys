@@ -1,0 +1,16 @@
+#MyEclipse Hibernate Properties
+#Thu Jul 19 00:29:32 CST 2018
+genVersionTag=false
+genAnnotations=false
+configFile=/SellRobotSys/src/hibernate.cfg.xml
+reStrategyClass=
+sessionFactoryId=
+profile=
+detectM2M=false
+genBasicCompId=false
+keyGenerator=
+createConfigFile=true
+basePersistenceClass=
+detectO2O=false
+useJavaTypes=true
+reSettingsFile=

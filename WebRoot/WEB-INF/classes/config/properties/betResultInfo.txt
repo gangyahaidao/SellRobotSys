@@ -1,0 +1,15 @@
+{
+"touser":"{{openid}}",
+"template_id":"QlOAGAPV5qhWrzUfR7RxEKt24M-2eoDY2n_1CtLW9RE",
+"topcolor":"#FF0000",
+"data":{
+	"first": {
+	"value":"{{betinfo}}",
+	"color":"#173177"
+	},
+	"keyword1":{
+		"value":"{{nickname}}",
+		"color":"#173177"
+	}
+}
+}
