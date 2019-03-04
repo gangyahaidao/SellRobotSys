@@ -6,6 +6,9 @@ import java.util.Date;
 import com.qingpu.socketservice.ClientSocketThreadDetect;
 import com.qingpu.socketservice.ClientSocketThreadRobot;
 
+/**
+ * 机器人人体检测和货柜连接线程
+ * */
 public class DetectClientSocket {
 	private Socket client; // 标识当前的socket连接通道
 	private ClientSocketThreadDetect clientThread; // 连接子线程

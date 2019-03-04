@@ -1554,6 +1554,52 @@ public class RobotsController extends HandlerInterceptorAdapter {
 		System.out.println("@@手机端发送控制命令返回值 = " + retStr);
 		return retStr;
 	}
+
+	/**
+	 * 遥控行走建图和设置路径点接口
+	 */
+	@RequestMapping(value="/teleopControlCmd")
+	@ResponseBody
+	public String teleopControlCmd(@RequestBody String body) {
+		ReturnObject retObj = new ReturnObject();		
+		
+		if(body != null && body != "") {
+			JSONObject object = new JSONObject(body);
+			String machineId = object.getString("machineId");
+			String cmdType = object.getString("teleopControlCmd");
+			System.out.println("@@接收到遥控命令 = " + cmdType);
+			RobotClientSocket robotObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
+			DetectClientSocket detectClientObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
+			if(detectClientObj != null) {
+				if(robotObj != null) {
+					if("F".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送前进命令");
+					}else if("L".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送左转命令");
+					}else if("R".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送右转命令");
+					}else if("S".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送停止命令");
+					}else if("B".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送后退命令");
+					}					
+				} else {
+					retObj.setMessage("电机行走控制程序未连接，请检查");
+				}
+			} else {
+				retObj.setMessage("底盘命令处理程序未连接，请检查");
+			}
+			
+		}
+		String retStr = new JSONObject(retObj).toString();
+		System.out.println("@@手机端发送控制命令返回值 = " + retStr);
+		return retStr;
+	}
 	
 	/**
 	 * 点击启动按钮启动机器人，更新机器人的路径循环控制信息

@@ -4,25 +4,35 @@ String path = request.getContextPath();
 String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.getServerPort()+path+"/";
 %>
 <!-- 零售机器人控制监控页面 -->
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!doctype html>
 <html>
-<head>
-<base href="<%=basePath%>">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>零售机器人控制</title>
-<meta http-equiv="pragma" content="no-cache">
-<meta http-equiv="cache-control" content="no-cache">
-<meta http-equiv="expires" content="0">
-<link rel="stylesheet" type="text/css" href="<%=basePath %>jsp/hongbao/lib/weui.min.css">
-<link rel="stylesheet" type="text/css" href="<%=basePath %>jsp/hongbao/css/jquery-weui.css">
-<link rel="stylesheet" type="text/css" href="<%=basePath %>jsp/hongbao/demos.css">
-</head>
+	<head>
+    <meta charset="utf-8">
+    <title>机器人售卖控制</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+    <link rel="stylesheet" href="<%=basePath %>jsp/css/weui.css"/>
+    <link rel="stylesheet" href="<%=basePath %>jsp/css/weuix.css"/>
+
+    <script src="<%=basePath %>jsp/js/zepto.min.js"></script>
+    <script src="<%=basePath %>jsp/js/zepto.weui.js"></script>
+    <script>
+        $(function(){
+            $(".weui-payselect-li").on('click',function(){
+                $(this).children().addClass("weui-payselect-on");
+                $(this).siblings().children().removeClass("weui-payselect-on");
+                return false;
+            })
+        });
+    </script>
+	</head>
 <body ontouchstart>
-	<header class='demos-header'>
-      <h1 class="demos-title">零售机器人控制</h1>
-    </header>
+	<div class="page-hd">
+    <h1 class="page-hd-title">
+        售卖控制
+    </h1>
+	</div>
     
-    <div class='demos-content-padded'>
+	<div class="page-bd-15">
       <a href="javascript:;" id="startLoopRun" class="weui-btn weui-btn_primary">启动循环行走</a>
       <a href="javascript:;" id="stopLoopRun" class="weui-btn weui-btn_warn">退出循环行走</a>
       <br>
@@ -33,11 +43,13 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
       <br>
       <hr>
       <br>
-      <a href="javascript:;" id="poweroff" class="weui-btn weui-btn_primary">关闭控制电脑电源</a>
-      
-    </div>
-	<script type="text/javascript" src="<%=basePath %>jsp/hongbao/lib/jquery-2.1.4.js"></script>
-	<script type="text/javascript" src="<%=basePath %>jsp/hongbao/lib/fastclick.js"></script>
+      <a href="javascript:;" id="poweroff" class="weui-btn weui-btn_primary">关闭控制电脑电源</a>      
+	</div>
+	<br>
+	<br>
+	<div class="weui-footer weui-footer_fixed-bottom">
+			<p class="weui-footer__text">Copyright 2019 &copy; 擎谱集团</p>
+	</div>	
 	<script type="text/javascript">  
 	    // 发送json-post请求
 		function sendJSONRequest(url, jsonObjData) {
@@ -56,7 +68,6 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 			})
 		}
 		$(function() {
-			FastClick.attach(document.body);
 			
 			// 启动遥控行走模式按钮绑定函数
 			$("#startLoopRun").click(function() {
@@ -97,6 +108,5 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 			})
 		})		 
 	 	</script>
-	<script type="text/javascript" src="<%=basePath %>jsp/hongbao/js/jquery-weui.js"></script>
 </body>
 </html>
