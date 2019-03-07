@@ -278,21 +278,24 @@ public class ClientSocketThreadRobot extends Thread {
 								System.out.println("@@到达终点货柜商品正常，不需要补货");
 							}
 							
+							// 判断是否需要循环行走，根据当前到达的终点判断继续下发路径点
 							JSONArray pathJSONArr = clientObj.getPosStayTimeJSONArr(); // 获取机器人绑定的路线jsonArr数据，在启动机器人进行循环行走时已经进行了设置
 							JSONArray sendPathJSONArr = new JSONArray();
 							System.out.println("@@机器人绑定的路线 = " + pathJSONArr);
 							if(pathJSONArr.length() > 0) { // 当机器人绑定的路线中有路径点
 								boolean needMove = false;
-								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点是路径的起始点
-									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，向底盘发送进行充电命令																	
+								clientObj.setHasRobotReachedGoal(false); // 因为设置了循环路径，且没有设置停止运行，则标记机器人处于忙状态
+								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点是路径的起始点，也就是充点电附近的地点
+									System.out.println("@@机器人到达充电点附近的一个终点");
+									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，向底盘发送进行充电命令
+										System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息，发送进行自动充电命令");
+										System.out.println("@@充电发送坐标信息 = " + pathJSONArr.getJSONObject(0));
 										ResponseSocketUtils.sendJsonDataToClient(
 												pathJSONArr.getJSONObject(0),
 												clientObj.getClient(),
 												QingpuConstants.SEND_START_CHARGE,
 												QingpuConstants.ENCRYPT_BY_NONE,
-												QingpuConstants.DATA_TYPE_JSON);
-										System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息，发送进行自动充电命令");
-										System.out.println("@@充电发送坐标信息 = " + pathJSONArr.getJSONObject(0));
+												QingpuConstants.DATA_TYPE_JSON);										
 										clientObj.setHasRobotReachedGoal(true); // 设置机器人处于停靠空闲状态
 										
 										// 清空原来设置的路径信息，不然被定时器停止后，网页上单击运行到某点又会开始循环
@@ -301,21 +304,41 @@ public class ClientSocketThreadRobot extends Thread {
 										clientObj.setStartPosName("");
 										clientObj.setPosStayTimeJSONArr(null);
 									} else {
-										for(int i = 0; i < pathJSONArr.length(); i++) { // 复制原来的路径信息
+										System.out.println("@@机器人到达充电点起始点，继续运动，注意：不合理，请检测");																				
+									}
+								} else if(currentPosName.equals(pathJSONArr.getJSONObject(1).getString("posName"))) { // 如果是到达充电点的下一个点
+									System.out.println("@@到达充电点的下一个终点");
+									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，则导航到充电点附近的一个点
+										System.out.println("@@停止循环，发送到达充电点的路径信息");
+										sendPathJSONArr.put(0, pathJSONArr.get(1));
+										sendPathJSONArr.put(1, pathJSONArr.get(0));																				
+										needMove = true;										
+									} else {
+										System.out.println("@@继续循环");
+										for(int i = 1; i < pathJSONArr.length(); i++) { // 复制原来的路径信息，但是去除第一个点充电点
 											sendPathJSONArr.put(i, pathJSONArr.get(i));
-										}
-										System.out.println("@@机器人到达起始点，继续运动");
-										clientObj.setHasRobotReachedGoal(false); // 因为设置了循环路径，且没有设置停止运行，则标记机器人处于忙状态
+										}										
 										needMove = true;
-									}
-								} else {
-									System.out.println("@@机器人到达另一端的终点，翻转路径继续运动");				
-									for(int i = pathJSONArr.length()-1, j = 0; i >= 0; i--, j++) { // 翻转原来的路径信息
-										sendPathJSONArr.put(j, pathJSONArr.get(i));
-									}
-									System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
-									needMove = true;
+									}									
+								} else if(currentPosName.equals(pathJSONArr.getJSONObject(pathJSONArr.length()-1).getString("posName"))) { // 如果是到了路径点的最后一个点终点
+									System.out.println("@@到达路径最后一个点终点");
+									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止循环
+										System.out.println("@@停止循环，翻转整条路径继续行走");
+										for(int i = pathJSONArr.length()-1, j = 0; i >= 0; i--, j++) { // 翻转原来的路径信息
+											sendPathJSONArr.put(j, pathJSONArr.get(i));
+										}
+										System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
+										needMove = true;										
+									} else {
+										System.out.println("@@往回走，继续循环");
+										for(int i = pathJSONArr.length()-1, j = 0; i >= 1; i--, j++) { // 翻转原来的路径信息，往回走的路径不包含充电点
+											sendPathJSONArr.put(j, pathJSONArr.get(i));
+										}
+										System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
+										needMove = true;
+									}									
 								}
+								
 								if(needMove) { // 如果需要继续运动，则运动之前先检测一下在这两个终点是否需要进行停留
 									DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
 									if(detectObj != null) {// 设置标志位不响应行走命令
