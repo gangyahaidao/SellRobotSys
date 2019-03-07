@@ -113,8 +113,8 @@ public class ServerSocketThreadAD extends Thread {
 						AdTemplateClientSocket beat = entry.getValue();
 						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*6){ //秒
 							beat.getClientThread().closeClient();//关闭连接socket和释放线程
-							it.remove();//从在线列表中移除
-							System.out.println("@@广告连接线程心跳超时，移除客户端 machineID = " + key);
+							// it.remove();//从在线列表中移除
+							// System.out.println("@@广告连接线程心跳超时，移除客户端 machineID = " + key);
 						}
 					}
 				}

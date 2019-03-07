@@ -19,11 +19,10 @@ public class PathListData {
 	private int orderId; // 用于客户端排序使用
 	private String floorName; // 楼层名字
 	private String name; // 路径的名称
-	private String startPosName; // 起始点名称
 	private int loopStaySec; // 循环一圈之后暂停的时间
 	
 	@Column(length=10240) // 设置数据库字段字符串长度
-	private String jsonPathStr; // 路径的json字符串数据，如：[{"posName":"实验室","staySec":30},{"posName":"商会","staySec":60},{"posName":"蔡总办公室","staySec":0}]
+	private String jsonPathStr; // 路径的json字符串数据，如：[{"posName":"实验室","staySec":30, "X":1.0, "Y":1.0, "Z":1.0},{"posName":"商会","staySec":60, "X":1.0, "Y":1.0, "Z":1.0}]
 	
 	public int getId() {
 		return id;
@@ -48,12 +47,6 @@ public class PathListData {
 	}
 	public void setFloorName(String floorName) {
 		this.floorName = floorName;
-	}
-	public String getStartPosName() {
-		return startPosName;
-	}
-	public void setStartPosName(String startPosName) {
-		this.startPosName = startPosName;
 	}
 	public int getLoopStaySec() {
 		return loopStaySec;

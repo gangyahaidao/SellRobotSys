@@ -231,35 +231,37 @@ public class ServerSocketThreadDetect extends Thread {
 		if(templateStr.contains("Weather")) { // 替换天气变量
 			String weatherStr = HttpRequestUtils.GetWeatherData("长沙");
 			JSONObject weatherObj = new JSONObject(weatherStr);
-			JSONObject dataObj = weatherObj.getJSONObject("data");
-			JSONArray jsonArr = dataObj.getJSONArray("forecast");
-			JSONObject obj = jsonArr.getJSONObject(0);
-			
-			String high = obj.getString("high"); // 获取高温			
-			String regEx="[^0-9]";  
-			Pattern p = Pattern.compile(regEx);  
-			Matcher m = p.matcher(high);  
-			high = m.replaceAll("").trim();
-			
-			String low = obj.getString("low"); // 获取低温			  
-			Pattern p2 = Pattern.compile(regEx);  
-			Matcher m2 = p2.matcher(low);  
-			low = m2.replaceAll("").trim();
-			
-			String resultStr = null;
-			int average = (Integer.parseInt(high)+Integer.parseInt(low))/2;
-			resultStr = CommonUtils.transferDigitalToString(average+""); // 将数字转换成汉字读法
-			resultStr = "长沙平均气温" + resultStr + "度，";
-			if(average <= 18) {
-				resultStr = resultStr + "气温有点低";
-			} else if(average >= 25) {
-				resultStr = resultStr + "有点热";
-			} else {
-				resultStr = resultStr + "凉爽舒适";
-			}
-			Map<String, String> map = new HashMap<String, String>();
-			map.put("Weather", resultStr);
-			templateStr = WeiXinUtils.render(templateStr, map);
+			if(weatherObj.has("data")) {
+				JSONObject dataObj = weatherObj.getJSONObject("data");
+				JSONArray jsonArr = dataObj.getJSONArray("forecast");
+				JSONObject obj = jsonArr.getJSONObject(0);
+				
+				String high = obj.getString("high"); // 获取高温			
+				String regEx="[^0-9]";  
+				Pattern p = Pattern.compile(regEx);  
+				Matcher m = p.matcher(high);  
+				high = m.replaceAll("").trim();
+				
+				String low = obj.getString("low"); // 获取低温			  
+				Pattern p2 = Pattern.compile(regEx);  
+				Matcher m2 = p2.matcher(low);  
+				low = m2.replaceAll("").trim();
+				
+				String resultStr = null;
+				int average = (Integer.parseInt(high)+Integer.parseInt(low))/2;
+				resultStr = CommonUtils.transferDigitalToString(average+""); // 将数字转换成汉字读法
+				resultStr = "长沙平均气温" + resultStr + "度，";
+				if(average <= 18) {
+					resultStr = resultStr + "气温有点低";
+				} else if(average >= 25) {
+					resultStr = resultStr + "有点热";
+				} else {
+					resultStr = resultStr + "凉爽舒适";
+				}
+				Map<String, String> map = new HashMap<String, String>();
+				map.put("Weather", resultStr);
+				templateStr = WeiXinUtils.render(templateStr, map);
+			}			
 		}
 		if(templateStr.contains("GoodsName") && machineId != null) { // 替换商品名称变量
 			int count = CommonUtils.getAppearCount(templateStr, "GoodsName");
@@ -441,10 +443,10 @@ public class ServerSocketThreadDetect extends Thread {
 						Map.Entry<String, DetectClientSocket> entry = it.next();
 						String key = entry.getKey();//机器编号
 						DetectClientSocket beat = entry.getValue();
-						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*3){ //秒
+						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*5){ //秒
 							beat.getClientThread().closeClient();//关闭连接socket和释放线程							
-							it.remove();//从在线列表中移除
-							System.out.println("@@人体识别线程心跳超时，移除客户端 machineID = " + key);
+							// it.remove();//从在线列表中移除
+							// System.out.println("@@人体识别线程心跳超时，移除客户端 machineID = " + key);
 						}
 					}
 				}

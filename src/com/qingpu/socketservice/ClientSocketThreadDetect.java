@@ -82,9 +82,9 @@ public class ClientSocketThreadDetect extends Thread {
 							ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(machineId);							
 							if((containerClient!=null && containerClient.isCustomScanQrCode()) || (containerClient!=null && containerClient.isInBuyGoodsProcess())) {
 								System.out.println("@@机器人处于被扫码或者出货状态，收到停止命令，发送停止命令到底盘");
-								ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令								
+								ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令
 							} else {
-								System.out.println("@@机器人没有处于扫码和出货状态，收到停止命令");
+								// System.out.println("@@机器人没有处于扫码和出货状态，收到停止命令");
 								if(deltaMilliSeconds >= QingpuConstants.RECV_STOP_DELAY_TIME) { // 停留时间超过指定秒数									
 									if(jsonObj.has("genderStr")) { // 播报指定的超时语句
 										String genderStr = jsonObj.getString("genderStr"); // people / male / female
@@ -101,22 +101,22 @@ public class ClientSocketThreadDetect extends Thread {
 										preMoveDate = new Date();
 										ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令
 									}
-								} else {
-									ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令
-								}
-								// 停止命令中包含有人体性别检测信息，检测信息客户端每隔一定时间才上传一次，只有停止和继续运动命令是每隔两秒上传一次
-								if(jsonObj.has("genderStr")) { // 非忙状态下才响应人体检测结果发送对话
-									String genderStr = jsonObj.getString("genderStr"); // people / male / female
-									System.out.println("@@自由巡逻状态收到停止命令，检测到人genderStr = " + genderStr);
-									String speakMessage = ServerSocketThreadDetect.findDialogByDetectResult("senseYes", genderStr, machineId); // 获取感应触发状态下的概率语音
-									System.out.println("@@播报语句 = " + speakMessage);
-									if(speakMessage != null) {
-										ServerSocketThreadDetect.sendDataToDetectSocket(machineId, speakMessage); // 发送语音数据到人体检测模块进行播报
-									}									
-								}
+								} else { // 正常停止消息
+									ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令									
+									// 停止命令中包含有人体性别检测信息，检测信息客户端每隔一定时间才上传一次，只有停止和继续运动命令是每隔两秒上传一次
+									if(jsonObj.has("genderStr")) { // 非忙状态下才响应人体检测结果发送对话
+										String genderStr = jsonObj.getString("genderStr"); // people / male / female
+										System.out.println("@@自由巡逻状态收到停止命令，检测到人genderStr = " + genderStr);
+										String speakMessage = ServerSocketThreadDetect.findDialogByDetectResult("senseYes", genderStr, machineId); // 获取感应触发状态下的概率语音
+										System.out.println("@@播报语句 = " + speakMessage);
+										if(speakMessage != null) {
+											ServerSocketThreadDetect.sendDataToDetectSocket(machineId, speakMessage); // 发送语音数据到人体检测模块进行播报
+										}									
+									}
+								}								
 							}							
 						} else if("move".equals(detectStr)){ // 接收到人体检测的继续运动命令，正常情况下人体检测模块两秒钟发送一次
-							preMoveDate = new Date();				
+							preMoveDate = new Date();
 							ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(machineId);
 							if(ServerSocketThreadDetect.detectMachineMap.get(machineId).isReachedGoalNeedStop() // 扫码超时检测是在货柜ClientSocketThread中进行检查的
 									|| (containerClient!=null && containerClient.isCustomScanQrCode())
@@ -134,7 +134,7 @@ public class ClientSocketThreadDetect extends Thread {
 									}
 									preStopDate = new Date(); // 更新延迟时间
 								}
-								System.out.println("@@发送巡逻运动命令");
+								// System.out.println("@@发送巡逻运动命令");
 								ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, false); // 继续运动
 							}							
 						}

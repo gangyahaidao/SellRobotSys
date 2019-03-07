@@ -17,6 +17,7 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
     <script src="<%=basePath %>jsp/js/zepto.min.js"></script>
     <script src="<%=basePath %>jsp/js/zepto.weui.js"></script>
     <script>
+    	var showAlert = false;
         function sendJSONRequest(url, jsonObjData) {
 			$.ajax({
 				type: "POST",
@@ -25,7 +26,14 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 				dataType: "json",
 				data: JSON.stringify(jsonObjData),
 				success: function(data){
-					$.alert(data.message);
+					console.log(data);
+					if(data.code == -1) {
+						$.alert(data.message);
+					}
+					if(showAlert) {
+						$.alert(data.message);
+						showAlert = false;
+					}
 				},
 				error:function(XMLHttpResponse, textStatus, errorThrown){
 					$.alert("失败： " + errorThrown);
@@ -68,6 +76,60 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
                 }
                 sendJSONRequest("robot/teleopControlCmd", data);
             })
+            //*****************************************************************************************//
+            $("#startScanMapMode").click(function(){
+                var data = {
+                    "machineId": "3",
+                    "moveCmd": "startScanMapMode"
+                }
+                showAlert = true;
+                sendJSONRequest("robot/teleopControlCmd", data);
+            })
+            $("#stopScanMapMode").click(function(){
+                var data = {
+                    "machineId": "3",
+                    "moveCmd": "stopScanMapMode"
+                }
+                showAlert = true;
+                sendJSONRequest("robot/teleopControlCmd", data);
+            })
+            $("#startNewPosMode").click(function(){
+                var data = {
+                    "machineId": "3",
+                    "moveCmd": "startNewPosMode"
+                }
+                showAlert = true;
+                sendJSONRequest("robot/teleopControlCmd", data);
+            })
+            $("#stopNewPosMode").click(function(){
+                var data = {
+                    "machineId": "3",
+                    "moveCmd": "stopNewPosMode"
+                }
+                showAlert = true;
+                sendJSONRequest("robot/teleopControlCmd", data);
+            })
+            $("#addNewPosName").click(function(){
+                $.prompt({
+                    title: "新地点",
+                    input: "",
+                    empty: false, // 是否允许为空
+                    onOK: function (input) {
+                        //点击确认
+                        var data = {
+                            "machineId": "3",
+                            "moveCmd": "addNewPosName",
+                            "posName": input
+                        }
+                        showAlert = true;
+                        sendJSONRequest("robot/teleopControlCmd", data);
+                    },
+                    onCancel: function () {
+                        //点击取消
+                    }
+                });
+            })
+
         });
     </script>
 </head>
@@ -80,9 +142,21 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
     </div>
 
     <div class="weui-pay">
+        <h1 class="weui-payselect-title">建图</h1>
+        <a href="javascript:;" id="startScanMapMode" class="weui-btn weui-btn_primary">启动建图模式</a>
+        <a href="javascript:;" id="stopScanMapMode" class="weui-btn weui-btn_warn">关闭建图并保存</a>
+        <div class="weui-loadmore weui-loadmore_line weui-loadmore_dot">
+            <span class="weui-loadmore__tips"></span>
+        </div>   
+        <a href="javascript:;" id="startNewPosMode" class="weui-btn weui-btn_primary">启动描点模式</a>        
+        <a href="javascript:;" id="addNewPosName" class="weui-btn weui-btn_primary">增加路径地点</a>
+        <a href="javascript:;" id="stopNewPosMode" class="weui-btn weui-btn_warn">关闭描点模式</a>
+        <div class="weui-loadmore weui-loadmore_line weui-loadmore_dot">
+            <span class="weui-loadmore__tips"></span>
+        </div>
         <h1 class="weui-payselect-title">遥控</h1>
         <ul class="weui-payselect-ul">
-            <div style="margin-bottom:100px">
+            <div class="margin20">
             	<li class="weui-payselect-li">
 	                <a href="javascript:;" class="weui-btn weui-btn_primary" style="visibility:hidden">隐藏</a>
 	            </li>

@@ -31,25 +31,16 @@ public class RobotClientSocket {
 	private JSONArray posStayTimeJSONArr; // 存储的是机器人绑定的路线json数组
 	private boolean hasTimerSendStartMove = false; // 定时器是否已经发送了开始运动命令，命令只发送一次
 	private boolean hasTimerSendStopMove = false; // 是否已经发送了停止命令，如果指定的运动时间到则马上返回起始点
+	private JSONObject currentPosObj = null; // 存储当前底盘上传的坐标点
+
+	private int loopStartPosStaySec; // 循环一圈之后在起始点停留的时间	
 	
-	private int loopStartPosStaySec; // 循环一圈之后在起始点停留的时间
-	
-	/**
-	 * 获取设置的停留点路径名字数组
-	 * */
-	public List<String> getPathPosNameArr() {
-		List<String> pathList = new ArrayList<String>();
-		
-		if(posStayTimeJSONArr != null) {
-			for(int i = 0; i < posStayTimeJSONArr.length(); i++) {
-				JSONObject obj = posStayTimeJSONArr.getJSONObject(i);
-				pathList.add(obj.getString("posName"));
-			}		
-			return pathList;
-		}else {
-			return null;
-		}
-		
+	public JSONObject getCurrentPosObj() {
+		return currentPosObj;
+	}
+
+	public void setCurrentPosObj(JSONObject currentPosObj) {
+		this.currentPosObj = currentPosObj;
 	}
 	
 	public Socket getClient() {

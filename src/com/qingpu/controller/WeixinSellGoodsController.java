@@ -170,6 +170,7 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 						ContainerClientSocket clientSocket = ServerSocketThread.containerMachineMap.get(machineId);
 						if(clientSocket != null && clientSocket.isInBuyGoodsProcess() == false) { // 如果当前没有在处理用户的付款出货，则播报用户扫码的欢迎语句
 							String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "userscan", "OK"); // 查询用户成功进行了扫码的对话
+							speakMessage = "!"+speakMessage;
 							ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);							
 						}
 						if(clientSocket != null) {
@@ -308,7 +309,8 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 						clientSocket.setCurrentOrderId(orderId); //设置当前的订单对象id
 					}					
 					// 通知货柜用户已经进行了支付
-					String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "userpay", "OK"); // 查询用户成功进行了支付的对话					
+					String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "userpay", "OK"); // 查询用户成功进行了支付的对话
+					speakMessage = "!"+speakMessage;
 					ServerSocketThreadDetect.sendDataToDetectSocket(machineID, speakMessage);	
 					
 					retObj.setCode(0);
@@ -522,6 +524,7 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 					// 通知货柜用户已经进行了支付
 					Robot robot = robotDao.getRobotByMachineId(machineId);
 					String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "userpay", "OK"); // 查询用户成功进行了支付的对话
+					speakMessage = "!"+speakMessage;
 					ServerSocketThreadDetect.sendDataToDetectSocket(machineId, speakMessage);
 				}else{
 					System.out.println("@@SellRobotSys已经收到回调通知了");

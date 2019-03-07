@@ -106,7 +106,6 @@ public class ClientSocketThreadRobot extends Thread {
 				if(content != null){ 
 					if(cmd == QingpuConstants.RECV_HEART_BEAT) { // 接收到底盘的心跳
 						JSONObject jsonobj = new JSONObject(new String(content));
-						System.out.println("@@收到底盘心跳 = " + jsonobj.toString());
 						String machineId = jsonobj.getString("machineId");
 						RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
 						if(clientObj != null) {
@@ -142,11 +141,7 @@ public class ClientSocketThreadRobot extends Thread {
 							clientObj.setClient(this.client);
 							clientObj.setClientThread(this);
 							clientObj.setMachineID(registerCode);
-							clientObj.setPreDate(new Date());
-							if("3".equals(registerCode)) { // 如果是三楼的机器人注册则设置起始点为擎谱武道馆
-								clientObj.setCurrentPosName("擎谱武道馆");
-								clientObj.setStartPosName("擎谱武道馆");
-							}
+							clientObj.setPreDate(new Date());							
 							clientObj.setHasRobotReachedGoal(true); // 设置机器人初始连接处于空闲状态
 						}						
 						ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);
@@ -254,8 +249,8 @@ public class ClientSocketThreadRobot extends Thread {
 						if(clientObj != null) {
 							String currentPosName = jsonObject.getString("reachedPosName");
 							System.out.println("@@到达最终点 = " + currentPosName);
-							clientObj.setCurrentPosName(currentPosName);// 设置机器人当前的路径点名称							
-														
+							clientObj.setCurrentPosName(currentPosName);// 设置机器人当前的路径点名称
+
 							// 判断机器人是否需要补货
 							String machineId = clientObj.getMachineID();
 							ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(machineId);
@@ -283,27 +278,42 @@ public class ClientSocketThreadRobot extends Thread {
 								System.out.println("@@到达终点货柜商品正常，不需要补货");
 							}
 							
-							List<String> pathList = clientObj.getPathPosNameArr(); // 获取机器人绑定路线的名称列表
-							System.out.println("@@机器人绑定的路线 = " + pathList);
-							if(pathList != null) {
+							JSONArray pathJSONArr = clientObj.getPosStayTimeJSONArr(); // 获取机器人绑定的路线jsonArr数据，在启动机器人进行循环行走时已经进行了设置
+							JSONArray sendPathJSONArr = new JSONArray();
+							System.out.println("@@机器人绑定的路线 = " + pathJSONArr);
+							if(pathJSONArr.length() > 0) { // 当机器人绑定的路线中有路径点
 								boolean needMove = false;
 								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点是路径的起始点
-									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止
+									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，向底盘发送进行充电命令																	
+										ResponseSocketUtils.sendJsonDataToClient(
+												pathJSONArr.getJSONObject(0),
+												clientObj.getClient(),
+												QingpuConstants.SEND_START_CHARGE,
+												QingpuConstants.ENCRYPT_BY_NONE,
+												QingpuConstants.DATA_TYPE_JSON);
+										System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息，发送进行自动充电命令");
+										System.out.println("@@充电发送坐标信息 = " + pathJSONArr.getJSONObject(0));
 										clientObj.setHasRobotReachedGoal(true); // 设置机器人处于停靠空闲状态
-										System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息");
+										
 										// 清空原来设置的路径信息，不然被定时器停止后，网页上单击运行到某点又会开始循环
 										clientObj.setStartLoopMiliTime(0);
 										clientObj.setStopLoopMiliTime(0);
 										clientObj.setStartPosName("");
 										clientObj.setPosStayTimeJSONArr(null);
 									} else {
+										for(int i = 0; i < pathJSONArr.length(); i++) { // 复制原来的路径信息
+											sendPathJSONArr.put(i, pathJSONArr.get(i));
+										}
 										System.out.println("@@机器人到达起始点，继续运动");
 										clientObj.setHasRobotReachedGoal(false); // 因为设置了循环路径，且没有设置停止运行，则标记机器人处于忙状态
 										needMove = true;
 									}
 								} else {
-									System.out.println("@@机器人到达另一端的终点，翻转路径继续运动");
-									Collections.reverse(pathList); // 路径反转
+									System.out.println("@@机器人到达另一端的终点，翻转路径继续运动");				
+									for(int i = pathJSONArr.length()-1, j = 0; i >= 0; i--, j++) { // 翻转原来的路径信息
+										sendPathJSONArr.put(j, pathJSONArr.get(i));
+									}
+									System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
 									needMove = true;
 								}
 								if(needMove) { // 如果需要继续运动，则运动之前先检测一下在这两个终点是否需要进行停留
@@ -382,7 +392,7 @@ public class ClientSocketThreadRobot extends Thread {
 									}										
 									
 									JSONObject jsonObj = new JSONObject();
-									jsonObj.put("carOneGoalPosName", new JSONArray(pathList));
+									jsonObj.put("carOneGoalPosName", sendPathJSONArr);
 									System.out.println("@@任务时间中继续运行循环路径 = " + jsonObj.toString());
 									ResponseSocketUtils.sendJsonDataToClient(
 											jsonObj, 
@@ -391,13 +401,18 @@ public class ClientSocketThreadRobot extends Thread {
 											QingpuConstants.ENCRYPT_BY_NONE,
 											QingpuConstants.DATA_TYPE_JSON);
 								}
-							} else { // 没有设置循环路径，说明机器人是处于网页点击控制运动模式
-								clientObj.setHasRobotReachedGoal(true); // 设置机器人处于停靠空闲状态
+							} else {
+								System.out.println("@@机器人当前没有路径点可行走，请检查");
 							}
 						} else {
 							System.out.println("@@接收到达终点位置时底盘连接断开");
 						}
-					}				
+					} else if(cmd == QingpuConstants.RECV_CURRENT_POS) { // 获取当前位置的坐标XYZ
+						System.out.println("@@收到坐标点  = " + new String(content));
+						JSONObject jsonObj = new JSONObject(new String(content));						
+						RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(this.getClient());
+						clientObj.setCurrentPosObj(jsonObj);						
+					}		
 				}				
 			}
 		}

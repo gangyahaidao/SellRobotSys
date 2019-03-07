@@ -125,7 +125,7 @@ public class ClientSocketThread extends Thread {
 				
 				if(clientSocket.isCustomScanQrCode()) { // 如果用户进行了扫码则停止并开始计时
 					scanDelayCount++;
-					if(scanDelayCount > 10*QingpuConstants.SCANQR_OVERFLOW_TIME) { // 扫码未付款大于XXs则继续行走
+					if(scanDelayCount > 20*QingpuConstants.SCANQR_OVERFLOW_TIME) { // 扫码未付款大于XXs则继续行走
 						clientSocket.setCustomScanQrCode(false);
 						scanDelayCount = 0;						
 						// 发送继续行走命令
@@ -275,6 +275,7 @@ public class ClientSocketThread extends Thread {
 								}
 								if(hasOutOne == false) { // 没有收到货物掉下的消息
 									String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "goodsout", "ERROR"); // 发送出货异常语音
+									speakMessage = "!"+speakMessage;
 									ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);
 									System.out.println("@@继续下一个出货");
 									continue; // 继续下一个出货
@@ -285,6 +286,7 @@ public class ClientSocketThread extends Thread {
 									
 									// 通知人体检测模块货柜已经完成了一个出货
 									String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "goodsout", "OK");
+									speakMessage = "!"+speakMessage;
 									ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);
 									//购买一个商品成功之后：1.将当前机器人商品层剩余数量减一     2.需要将此种商品总数量减一
 									robotFloorList.get(currentGoodsFloorIndex).setCurrentCount(leftCount-1); // 当前层商品数量-1
@@ -311,18 +313,19 @@ public class ClientSocketThread extends Thread {
 							// 等待商品被拿走的消息上报
 							int waitCount = 0;
 							String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "opendoor", "ERROR"); // 还未拿走商品的对话
+							speakMessage = "!"+speakMessage;
 							while(!clientSocket.isDoorOpened()) {
 								try {
 									Thread.sleep(200);
 									waitCount++;
 									if(waitCount == 5*10) {
-										System.out.println("@@等待15秒未拿走商品，第一次播报警告信息");
+										System.out.println("@@等待15秒未拿走商品，第一次播报警告信息");										
 										ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);
 										try {
 											Thread.sleep(4000); // 休眠一段时间，让提醒拿货语句播放完毕
 										} catch (InterruptedException e) {
 											e.printStackTrace();
-										}							
+										}
 										break; // 只播报一次就退出等待
 									}
 								} catch (InterruptedException e) {
@@ -330,6 +333,7 @@ public class ClientSocketThread extends Thread {
 								}
 							}
 							speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "opendoor", "OK"); // 成功拿走商品的对话，或者是等待拿走货物超时
+							speakMessage = "!"+speakMessage;
 							ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);// 最后播报期待再次光临语句
 							try {
 								Thread.sleep(4000); // 休眠一段时间，让最后欢迎语句播放完毕

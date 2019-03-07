@@ -1341,7 +1341,6 @@ public class RobotsController extends HandlerInterceptorAdapter {
 			
 			PathListData path = new PathListData();
 			path.setName(name);
-			path.setStartPosName(startPosName);
 			path.setLoopStaySec(loopStaySec);
 			path.setJsonPathStr(pathJSONArr.toString());
 			path.setFloorName(floorName);
@@ -1403,10 +1402,8 @@ public class RobotsController extends HandlerInterceptorAdapter {
 				String startPosName = pathTaskObj.getString("startPosName");
 				int loopStaySec = pathTaskObj.getInt("loopStaySec");
 				String floorName = pathTaskObj.getString("floorName"); // 路线所属楼层的名字
-				JSONArray pathJSONArr = pathTaskObj.getJSONArray("pathDataList");
-				
+				JSONArray pathJSONArr = pathTaskObj.getJSONArray("pathDataList");				
 				path.setName(name);
-				path.setStartPosName(startPosName);
 				path.setLoopStaySec(loopStaySec);
 				path.setFloorName(floorName);
 				path.setJsonPathStr(pathJSONArr.toString());				
@@ -1450,7 +1447,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 	}
 	
 	/**
-	 * 尝试给指定向指定编号的机器人发送控制行走命令
+	 * 手机页面上向指定编号的机器人发送路径导航循环控制命令
 	 * "startLoopRun"：开始循环行走
 	 * "stopLoopRun"：停止循环行走
 	 * "enterPatrolMode"：进入雷达导航状态
@@ -1477,7 +1474,11 @@ public class RobotsController extends HandlerInterceptorAdapter {
 								Robot robot = robotDao.getRobotByMachineId(machineId);
 								if(robot != null) {
 									PathListData path = robotDao.getPathById(robot.getPathId());
-									String startPosName = path.getStartPosName();
+									JSONArray pathJSONArr = new JSONArray(path.getJsonPathStr()); // 设置机器人的当前位置点名称和起点位置
+									JSONObject itemObj = pathJSONArr.getJSONObject(0);
+									robotObj.setCurrentPosName(itemObj.getString("posName"));
+									robotObj.setStartPosName(itemObj.getString("posName"));
+									
 									JSONArray posStayTimeArr = new JSONArray(path.getJsonPathStr());
 									int loopStartPosStaySec = path.getLoopStaySec();
 									
@@ -1490,7 +1491,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 									long stopLoopMiliTime = currentTime + 60*60*1000; // 在当前毫秒基础上增加一个小时
 									robotObj.setStartLoopMiliTime(startLoopMiliTime); // 只有在停靠状态才可以更新起止时间和
 									robotObj.setStopLoopMiliTime(stopLoopMiliTime);
-									robotObj.setStartPosName(startPosName);
+									robotObj.setStartPosName(robotObj.getStartPosName());
 									robotObj.setPosStayTimeJSONArr(posStayTimeArr);
 									robotObj.setLoopStartPosStaySec(loopStartPosStaySec); // 一个循环之后暂停的时间
 									robotObj.setHasTimerSendStartMove(false); // 重置定时器发送控制命令
@@ -1501,11 +1502,10 @@ public class RobotsController extends HandlerInterceptorAdapter {
 									ServerSocketThreadRobot.robotMachineMap.put(machineId, robotObj);
 									
 									// 发送新设置的路径给底盘
-									List<String> pathArr = robotObj.getPathPosNameArr();
-									if(robotObj.getCurrentPosName().equals(startPosName)) { // 如果当前路径点与设置的起始路径点名字相同，则发送路径列表给底盘
+									if(robotObj.getCurrentPosName().equals(robotObj.getStartPosName())) { // 如果当前路径点与设置的起始路径点名字相同，则发送路径列表给底盘
 										JSONObject jsonObj = new JSONObject();
-										jsonObj.put("carOneGoalPosName", new JSONArray(pathArr));
-										System.out.println("@@立即执行路径 = " + jsonObj.toString());
+										jsonObj.put("carOneGoalPosName", new JSONArray(path.getJsonPathStr()));
+										System.out.println("@@手机控制立即执行路径 = " + jsonObj.toString());
 										ResponseSocketUtils.sendJsonDataToClient(
 												jsonObj, 
 												robotObj.getClient(),
@@ -1566,12 +1566,13 @@ public class RobotsController extends HandlerInterceptorAdapter {
 		if(body != null && body != "") {
 			JSONObject object = new JSONObject(body);
 			String machineId = object.getString("machineId");
-			String cmdType = object.getString("teleopControlCmd");
+			String cmdType = object.getString("moveCmd");
 			System.out.println("@@接收到遥控命令 = " + cmdType);
 			RobotClientSocket robotObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
 			DetectClientSocket detectClientObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
 			if(detectClientObj != null) {
 				if(robotObj != null) {
+					retObj.setCode(0);
 					if("F".equals(cmdType)) {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@发送前进命令");
@@ -1587,9 +1588,134 @@ public class RobotsController extends HandlerInterceptorAdapter {
 					}else if("B".equals(cmdType)) {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@发送后退命令");
-					}					
+					} else if("stopScanMapMode".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@退出建图模式");
+					} else if("addNewPosName".equals(cmdType)) {						
+						// 向底盘发送命令获取当前的坐标信息
+						Robot robot = robotDao.getRobotByMachineId(machineId); // 获取机器人当前绑定的路径信息，如果存在相同名字的地点，则更新此地点的坐标信息，否则增加新的地点和坐标
+						if(robot != null) {
+							PathListData path = robotDao.getPathById(robot.getPathId());
+							if(path != null) {
+								String posName = object.getString("posName");
+								// 向底盘通过socket发送命令，获取当前位置的坐标点								
+								JSONObject sendJsonObj = new JSONObject();
+								sendJsonObj.put("getCurrentPos", 1);
+								ResponseSocketUtils.sendJsonDataToClient(
+										sendJsonObj,
+										robotObj.getClient(),
+										QingpuConstants.SEND_GET_CURRENT_POS,
+										QingpuConstants.ENCRYPT_BY_NONE,
+										QingpuConstants.DATA_TYPE_JSON);
+								int delayCount = 0;
+								while(robotObj.getCurrentPosObj() == null) { // 等待接收底盘上传的当前坐标
+									try {
+										Thread.sleep(20);
+										delayCount++;
+										if(delayCount >= 50*6) {
+											System.out.println("@@长时间等待底盘未上传当前的坐标点");
+											retObj.setMessage("长时间等待底盘未上传当前的坐标点");
+											break;
+										}
+									} catch (InterruptedException e) {
+										e.printStackTrace();
+									}									
+								}
+								if(robotObj.getCurrentPosObj() != null) {
+									JSONObject posObj = robotObj.getCurrentPosObj();
+									robotObj.setCurrentPosObj(null); // 清空当前存储的坐标点，为下一次接收做准备
+									double X = posObj.getDouble("X");
+									double Y = posObj.getDouble("Y");
+									double Z = posObj.getDouble("Z");
+									JSONArray pathNameArr = null;
+									if(path.getJsonPathStr().length() > 0) { // 如果当前路径字符串不是一个空的
+										pathNameArr = new JSONArray(path.getJsonPathStr());
+									} else {
+										pathNameArr = new JSONArray();
+									}									
+									if(pathNameArr.length() <= 0) { // 如果当前绑定的路径为空
+										JSONObject newPosObj = new JSONObject();
+										newPosObj.put("posName", posName);
+										newPosObj.put("staySec", 0);
+										newPosObj.put("X", X);
+										newPosObj.put("Y", Y);
+										newPosObj.put("Z", Z);
+										pathNameArr.put(0, newPosObj);
+									} else {
+										boolean hasSameName = false;
+										int index = 0;
+										for(int i = 0; i < pathNameArr.length(); i++) {
+											JSONObject obj = pathNameArr.getJSONObject(i);
+											String posNameStr = obj.getString("posName");
+											if(posName.equals(posNameStr)) {
+												hasSameName = true;
+												index = i;
+											}
+										}
+										if(hasSameName) { // 如果当前输入的地点名称已经存在，则只更新XYZ的值
+											JSONObject obj = pathNameArr.getJSONObject(index);
+											obj.put("X", X);
+											obj.put("Y", Y);
+											obj.put("Z", Z);
+											pathNameArr.put(index, obj);
+										} else {
+											JSONObject newPosObj = new JSONObject();
+											newPosObj.put("posName", posName);
+											newPosObj.put("staySec", 0);
+											newPosObj.put("X", X);
+											newPosObj.put("Y", Y);
+											newPosObj.put("Z", Z);
+											pathNameArr.put(pathNameArr.length(), newPosObj);
+										}
+									}	
+									// 保存路径对象字符串到数据库
+									path.setJsonPathStr(pathNameArr.toString());
+									robotDao.updatePathData(path);
+									retObj.setMessage("@@保存中间路径点成功");
+									retObj.setCode(0);
+								} else {
+									robotObj.setCurrentPosObj(null);
+								}							
+							} else {
+								retObj.setMessage("@@当前机器人未绑定路径，请先绑定一条路径后重试");
+							}
+						} else {
+							retObj.setMessage("@@机器人不存在");
+						}
+					}
 				} else {
-					retObj.setMessage("电机行走控制程序未连接，请检查");
+					retObj.setCode(0);
+					if("F".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送前进命令");
+					}else if("L".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送左转命令");
+					}else if("R".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送右转命令");
+					}else if("S".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送停止命令");
+					}else if("B".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@发送后退命令");
+					} else if("startScanMapMode".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@进入建图模式"); // 建图建图模式，此模式底盘ROS客户端没有连接
+					} else if("stopScanMapMode".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@退出建图模式");
+					} else if("startNewPosMode".equals(cmdType)) { // 进入创建路径点模式
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@进入创建路径点模式");
+					} else if("stopNewPosMode".equals(cmdType)) {
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@退出创建路径点模式");
+					} else {
+						retObj.setCode(-1);
+						retObj.setMessage("电机行走控制客户端未连接，请检查");
+					}
 				}
 			} else {
 				retObj.setMessage("底盘命令处理程序未连接，请检查");
@@ -1602,7 +1728,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 	}
 	
 	/**
-	 * 点击启动按钮启动机器人，更新机器人的路径循环控制信息
+	 * 电脑浏览器网页上点击启动循环按钮启动机器人，更新机器人的路径循环控制信息，如果没有填写启动时间则默认是立即启动
 	 * */
 	@RequestMapping(value="/updateRobotControlInfo")
 	@ResponseBody
@@ -1627,13 +1753,16 @@ public class RobotsController extends HandlerInterceptorAdapter {
 				robotDao.updateRobotInfo(robot); // 更新设置
 				
 				RobotClientSocket robotObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
-				if(robotObj != null) {
-					if(robotObj.isHasRobotReachedGoal()) { // 设定的停止时间到了之后，定时器发送归位命令，底盘到达目标点之后置位此标识												
+				if(robotObj != null) {					
+					if(robotObj.isHasRobotReachedGoal()) { // 设定的停止时间到了之后，定时器发送归位命令，底盘到达起点最终点之后置位此标识												
 						long startLoopMiliTime = CommonUtils.translateHourStrToMiniSec(startLoopTimeStr); 
 						long stopLoopMiliTime = CommonUtils.translateHourStrToMiniSec(stopLoopTimeStr);
 						
-						PathListData path = robotDao.getPathById(robot.getPathId());
-						String startPosName = path.getStartPosName();
+						PathListData path = robotDao.getPathById(robot.getPathId());						
+						JSONArray pathJSONArr = new JSONArray(path.getJsonPathStr()); // 设置机器人的当前位置点名称和起点位置
+						JSONObject itemObj = pathJSONArr.getJSONObject(0);
+						robotObj.setCurrentPosName(itemObj.getString("posName"));
+						robotObj.setStartPosName(itemObj.getString("posName"));						
 						JSONArray posStayTimeArr = new JSONArray(path.getJsonPathStr());
 						int loopStartPosStaySec = path.getLoopStaySec();
 						
@@ -1644,7 +1773,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 
 						robotObj.setStartLoopMiliTime(startLoopMiliTime); // 只有在停靠状态才可以更新起止时间和
 						robotObj.setStopLoopMiliTime(stopLoopMiliTime);
-						robotObj.setStartPosName(startPosName);
+						robotObj.setStartPosName(robotObj.getStartPosName());
 						robotObj.setPosStayTimeJSONArr(posStayTimeArr);
 						robotObj.setLoopStartPosStaySec(loopStartPosStaySec); // 一个循环之后暂停的时间
 						robotObj.setHasTimerSendStartMove(false); // 重置定时器发送控制命令
@@ -1659,11 +1788,10 @@ public class RobotsController extends HandlerInterceptorAdapter {
 							robotObj.setHasRobotReachedGoal(false); // 设置机器人已经处于运行状态，不再响应其他设置命令
 							ServerSocketThreadRobot.robotMachineMap.put(machineId, robotObj);
 							// 发送新设置的路径给底盘
-							List<String> pathArr = robotObj.getPathPosNameArr();
-							if(robotObj.getCurrentPosName().equals(startPosName)) { // 如果当前路径点与设置的起始路径点名字相同，则发送路径列表给底盘
+							if(robotObj.getCurrentPosName().equals(robotObj.getStartPosName())) { // 如果当前路径点与设置的起始路径点名字相同，则发送路径列表给底盘
 								JSONObject jsonObj = new JSONObject();
-								jsonObj.put("carOneGoalPosName", new JSONArray(pathArr));
-								System.out.println("@@立即执行路径 = " + jsonObj.toString());
+								jsonObj.put("carOneGoalPosName", new JSONArray(path.getJsonPathStr()));
+								System.out.println("@@电脑网页控制立即执行路径 = " + jsonObj.toString());
 								ResponseSocketUtils.sendJsonDataToClient(
 										jsonObj, 
 										robotObj.getClient(),

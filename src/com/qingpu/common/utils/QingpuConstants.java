@@ -27,9 +27,12 @@ public class QingpuConstants {
 	public static final int RECV_ROBOT_REACHED_GOAL = 0x9002; // 到达目标点
 	public static final int SEND_ROBOT_GOAL = 0x9003; // 发送机器人要前往的目标地点
 	public static final int SEND_ROBOT_RUN_CONTROL = 0x9004; // 发送机器人是否继续运动的命令
+	public static final int SEND_GET_CURRENT_POS = 0x9005; // 获取当前位置的XYZ坐标
+	public static final int RECV_CURRENT_POS = 0x9006; // 接收当前的位置坐标
 	
 	public static final int RECV_HEART_BEAT = 0x9007; // 接收底盘心跳
 	public static final int SEND_BACK_HEART_BEAT = 0x9008; // 发送底盘心跳
+	public static final int SEND_START_CHARGE = 0x9009; // 开始充电对接命令
 		
 	/**
 	 * 音频翻译相关的常量
@@ -46,8 +49,8 @@ public class QingpuConstants {
 	 * 零售机器人运动对话播放相关的时间变量
 	 * */
 	public static final int RECV_STOP_DELAY_TIME = 1000*15; // 持续接收到停止命令停止的时间
-	public static final int RECV_STOP_DELAY_GOON = 1000*6; // 停止超时之后继续运动的时间
-	public static final int RECV_MOVE_CONTINUE_TIME = 1000*25; // 自由巡逻状态下每隔此时间则查找一个对话进行播放
-	public static final int SCANQR_OVERFLOW_TIME = 30; // 秒，扫码未付款超时的时间
+	public static final int RECV_STOP_DELAY_GOON = 1000*8; // 停止超时之后继续运动的时间
+	public static final int RECV_MOVE_CONTINUE_TIME = 1000*50; // 自由巡逻状态下每隔此时间则查找一个对话进行播放
+	public static final int SCANQR_OVERFLOW_TIME = 25; // 秒，扫码未付款超时的时间
 
 }

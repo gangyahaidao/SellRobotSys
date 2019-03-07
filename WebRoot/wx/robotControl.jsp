@@ -35,14 +35,14 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 	<div class="page-bd-15">
       <a href="javascript:;" id="startLoopRun" class="weui-btn weui-btn_primary">启动循环行走</a>
       <a href="javascript:;" id="stopLoopRun" class="weui-btn weui-btn_warn">退出循环行走</a>
-      <br>
-      <hr>
-      <br>      
+      <div class="weui-loadmore weui-loadmore_line weui-loadmore_dot">
+		<span class="weui-loadmore__tips"></span>
+	  </div>
       <a href="javascript:;" id="startAutoPatrolMode" class="weui-btn weui-btn_primary">启动自动导航模式</a>
       <a href="javascript:;" id="stopAutoPatrolMode" class="weui-btn weui-btn_warn">停止自动导航模式</a>
-      <br>
-      <hr>
-      <br>
+      <div class="weui-loadmore weui-loadmore_line weui-loadmore_dot">
+		<span class="weui-loadmore__tips"></span>
+	  </div>
       <a href="javascript:;" id="poweroff" class="weui-btn weui-btn_primary">关闭控制电脑电源</a>      
 	</div>
 	<br>

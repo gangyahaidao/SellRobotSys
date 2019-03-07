@@ -91,9 +91,8 @@ public class TimerServiceImpl implements TimerService {
 						robotClient.setHasTimerSendStartMove(true);// 设置已经发送了开始运动命令
 						robotClient.setHasRobotReachedGoal(false); // 设置机器人处于运动模式，不响应网页上的控制命令
 						
-						List<String> sendPathList = robotClient.getPathPosNameArr();
 						JSONObject jsonObj = new JSONObject();
-						jsonObj.put("carOneGoalPosName", new JSONArray(sendPathList));
+						jsonObj.put("carOneGoalPosName", robotClient.getPosStayTimeJSONArr());
 						System.out.println("--定时器发送启动运行路径 = " + jsonObj.toString());
 						ResponseSocketUtils.sendJsonDataToClient(
 								jsonObj, 
