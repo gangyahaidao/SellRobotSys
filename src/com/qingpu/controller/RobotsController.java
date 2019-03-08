@@ -1572,6 +1572,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 			DetectClientSocket detectClientObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
 			if(detectClientObj != null) {
 				if(robotObj != null) {
+					System.out.println("@@机器人底盘处于连接状态");
 					retObj.setCode(0);
 					if("F".equals(cmdType)) {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
@@ -1589,8 +1590,15 @@ public class RobotsController extends HandlerInterceptorAdapter {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@发送后退命令");
 					} else if("stopScanMapMode".equals(cmdType)) {
+						retObj.setCode(-1);
+						retObj.setMessage("@@退出建图模式");
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@退出建图模式");
+					} else if("stopNewPosMode".equals(cmdType)) {
+						retObj.setCode(-1);
+						retObj.setMessage("退出创建路径点模式");
+						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
+						System.out.println("@@退出创建路径点模式");
 					} else if("addNewPosName".equals(cmdType)) {						
 						// 向底盘发送命令获取当前的坐标信息
 						Robot robot = robotDao.getRobotByMachineId(machineId); // 获取机器人当前绑定的路径信息，如果存在相同名字的地点，则更新此地点的坐标信息，否则增加新的地点和坐标
@@ -1684,6 +1692,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 						}
 					}
 				} else {
+					System.out.println("@@机器人底盘客户端没有处于连接状态");
 					retObj.setCode(0);
 					if("F".equals(cmdType)) {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
@@ -1701,17 +1710,20 @@ public class RobotsController extends HandlerInterceptorAdapter {
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@发送后退命令");
 					} else if("startScanMapMode".equals(cmdType)) {
+						retObj.setCode(-1);
+						retObj.setMessage("进入建图");
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@进入建图模式"); // 建图建图模式，此模式底盘ROS客户端没有连接
 					} else if("stopScanMapMode".equals(cmdType)) {
+						retObj.setCode(-1);
+						retObj.setMessage("退出建图");
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@退出建图模式");
 					} else if("startNewPosMode".equals(cmdType)) { // 进入创建路径点模式
+						retObj.setCode(-1);
+						retObj.setMessage("进入创建路径点模式");
 						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
 						System.out.println("@@进入创建路径点模式");
-					} else if("stopNewPosMode".equals(cmdType)) {
-						ServerSocketThreadDetect.sendControlCmdToDetectSocket(machineId, cmdType);
-						System.out.println("@@退出创建路径点模式");
 					} else {
 						retObj.setCode(-1);
 						retObj.setMessage("电机行走控制客户端未连接，请检查");

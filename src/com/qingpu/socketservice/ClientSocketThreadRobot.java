@@ -316,7 +316,7 @@ public class ClientSocketThreadRobot extends Thread {
 									} else {
 										System.out.println("@@继续循环");
 										for(int i = 1; i < pathJSONArr.length(); i++) { // 复制原来的路径信息，但是去除第一个点充电点
-											sendPathJSONArr.put(i, pathJSONArr.get(i));
+											sendPathJSONArr.put(i-1, pathJSONArr.get(i));
 										}										
 										needMove = true;
 									}									
@@ -415,6 +415,7 @@ public class ClientSocketThreadRobot extends Thread {
 									}										
 									
 									JSONObject jsonObj = new JSONObject();
+									
 									jsonObj.put("carOneGoalPosName", sendPathJSONArr);
 									System.out.println("@@任务时间中继续运行循环路径 = " + jsonObj.toString());
 									ResponseSocketUtils.sendJsonDataToClient(
