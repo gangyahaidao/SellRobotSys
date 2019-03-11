@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.qingpu.user.dao.UserDao;
 import com.qingpu.user.entity.User;
 import com.qingpu.user.entity.UserWeixin;
+import com.qingpu.user.entity.UserWeixinOriginal;
 
 @Service("userService")
 public class UserServiceImpl implements UserService {
@@ -71,4 +72,33 @@ public class UserServiceImpl implements UserService {
 		userDao.saveWeixinUser(userWX);
 	}
 
+	@Override
+	public UserWeixinOriginal getOriginalUserByOpenid(String openid) {
+		List<UserWeixinOriginal> list = userDao.getOriginalUserByOpenId(openid);
+		if(list.size() > 0){
+			return list.get(0);
+		}else{
+			return null;
+		}
+	}
+
+	@Override
+	public void updateWeixinUserOriginal(UserWeixinOriginal userWX) {
+		userDao.updateWeixinUserOriginal(userWX);
+	}
+
+	@Override
+	public void saveWeixinUserOriginal(UserWeixinOriginal userWX) {
+		userDao.saveWeixinUserOriginal(userWX);
+	}
+
+	@Override
+	public UserWeixinOriginal getOriginalUserCanRecvAdminInfo() {
+		List<UserWeixinOriginal> list = userDao.getOriginalUserCanRecvAdminInfo();
+		if(list.size() > 0){
+			return list.get(0);
+		}else{
+			return null;
+		}
+	}
 }

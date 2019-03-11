@@ -31,9 +31,11 @@ import com.qingpu.adtemplate.entity.AdTemplate;
 import com.qingpu.common.entity.ReturnObject;
 import com.qingpu.common.service.ActionConstants;
 import com.qingpu.common.service.BaseLogService;
+import com.qingpu.common.service.WeiXinTemplateService;
 import com.qingpu.common.utils.CommonUtils;
 import com.qingpu.common.utils.FileUtils;
 import com.qingpu.common.utils.QingpuConstants;
+import com.qingpu.common.utils.WeiXinUtils;
 import com.qingpu.goods.entity.Goods;
 import com.qingpu.goods.entity.OrderItem;
 import com.qingpu.goods.entity.Orders;
@@ -1464,7 +1466,7 @@ public class RobotsController extends HandlerInterceptorAdapter {
 			String cmdType = object.getString("cmdType"); // 请求的命令类型
 			System.out.println("@@手机发送控制命令cmdType = " + cmdType);
 			RobotClientSocket robotObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
-			DetectClientSocket detectClientObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
+			DetectClientSocket detectClientObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);			
 			
 			if(detectClientObj != null) {
 				if("startLoopRun".equals(cmdType) || "stopLoopRun".equals(cmdType)) { // 开始循环行走

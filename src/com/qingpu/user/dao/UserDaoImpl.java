@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.qingpu.common.dao.BaseDaoImpl;
 import com.qingpu.user.entity.User;
 import com.qingpu.user.entity.UserWeixin;
+import com.qingpu.user.entity.UserWeixinOriginal;
 
 @Repository("userDao")
 public class UserDaoImpl extends BaseDaoImpl implements UserDao {
@@ -56,5 +57,25 @@ public class UserDaoImpl extends BaseDaoImpl implements UserDao {
 	public void saveWeixinUser(UserWeixin userWX) {
 		UserWeixin user = (UserWeixin) save(userWX);
 		System.out.println("--SellRobotSys保存UserWeiXin对象 user = " + new JSONObject(user));
+	}
+
+	@Override
+	public List<UserWeixinOriginal> getOriginalUserByOpenId(String openid) {
+		return (List<UserWeixinOriginal>)findByHqlParams("from UserWeixinOriginal where openid=?", new Object[]{openid});
+	}
+
+	@Override
+	public void updateWeixinUserOriginal(UserWeixinOriginal userWX) {
+		update(userWX);
+	}
+
+	@Override
+	public void saveWeixinUserOriginal(UserWeixinOriginal userWX) {
+		save(userWX);
+	}
+
+	@Override
+	public List<UserWeixinOriginal> getOriginalUserCanRecvAdminInfo() {
+		return (List<UserWeixinOriginal>)findByHqlParams("from UserWeixinOriginal where canRecvAdminInfo=? order by date desc", new Object[]{true}); // 按照时间降序排序
 	}
 }

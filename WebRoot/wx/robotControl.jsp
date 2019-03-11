@@ -43,7 +43,8 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
       <div class="weui-loadmore weui-loadmore_line weui-loadmore_dot">
 		<span class="weui-loadmore__tips"></span>
 	  </div>
-      <a href="javascript:;" id="poweroff" class="weui-btn weui-btn_primary">关闭控制电脑电源</a>      
+      <a href="javascript:;" id="poweroff" class="weui-btn weui-btn_primary">关闭控制电脑电源</a>
+      <a href="javascript:;" id="testSendText" class="weui-btn weui-btn_primary">测试发送模板消息</a>           
 	</div>
 	<br>
 	<br>
@@ -67,8 +68,7 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 				}
 			})
 		}
-		$(function() {
-			
+		$(function() {			
 			// 启动遥控行走模式按钮绑定函数
 			$("#startLoopRun").click(function() {
 				var data = {
@@ -103,6 +103,13 @@ String basePath = request.getScheme()+"://"+request.getServerName()+":"+request.
 				var data = {
 					"machineId": "3",
 					"cmdType": "poweroff"
+				}
+				sendJSONRequest("robot/sendRobotControlCmd", data);
+			})
+			$("#testSendText").click(function() {
+				var data = {
+					"machineId": "3",
+					"cmdType": "testSendText"
 				}
 				sendJSONRequest("robot/sendRobotControlCmd", data);
 			})

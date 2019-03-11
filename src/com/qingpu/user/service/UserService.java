@@ -2,6 +2,7 @@ package com.qingpu.user.service;
 
 import com.qingpu.user.entity.User;
 import com.qingpu.user.entity.UserWeixin;
+import com.qingpu.user.entity.UserWeixinOriginal;
 
 public interface UserService {
 	
@@ -18,4 +19,12 @@ public interface UserService {
 	public void updateWeixinUser(UserWeixin userWX);
 
 	public void saveWeixinUser(UserWeixin userWX);
+
+	public UserWeixinOriginal getOriginalUserByOpenid(String openid);
+
+	public void updateWeixinUserOriginal(UserWeixinOriginal userWX);
+
+	public void saveWeixinUserOriginal(UserWeixinOriginal userWX);
+
+	public UserWeixinOriginal getOriginalUserCanRecvAdminInfo();
 }

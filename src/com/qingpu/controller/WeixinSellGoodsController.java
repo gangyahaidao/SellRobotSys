@@ -3,6 +3,8 @@ package com.qingpu.controller;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -12,6 +14,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import javax.annotation.Resource;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -49,6 +52,7 @@ import com.qingpu.socketservice.ServerSocketThread;
 import com.qingpu.socketservice.ServerSocketThreadDetect;
 import com.qingpu.socketservice.ServerSocketThreadRobot;
 import com.qingpu.user.entity.UserWeixin;
+import com.qingpu.user.entity.UserWeixinOriginal;
 import com.qingpu.user.service.UserService;
 
 @Controller
@@ -61,7 +65,7 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 	@Resource
 	private GoodsService goodsService;
 	@Resource
-	private WeiXinTemplateService weiXinTemplateService;
+	WeiXinTemplateService weiXinTemplateService;
 	
 	/**
 	 * 扫码获取机器人商品列表
@@ -159,12 +163,7 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 						ret.put("code", 0);
 						ret.put("message", "success");
 						// System.out.println("@@发送商品列表信息 = " + ret);
-						writer.write(ret.toString());
-						
-//						String sendStr = "用户" + EmojiUtil.emojiRecovery(userWX.getNickname()) + "进行了扫码"; // 发送消息到指定用户的微信上
-//						String recvMessageOpenid = "oPr4242BNciQoIXriB-y_8UswpEM";
-//						weiXinTemplateService.sendTemplateMessage(sendStr, recvMessageOpenid);
-//						System.out.println("@@发送通知消息到管理员");
+						writer.write(ret.toString());					
 						
 						// 发送消息到货柜通知用户进行了扫码操作
 						ContainerClientSocket clientSocket = ServerSocketThread.containerMachineMap.get(machineId);
@@ -542,4 +541,109 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 		}
 		return;
 	}	
+	
+	/**
+	 * 获取微信服务号用户openid和详细接口1
+	 * */
+	@RequestMapping("/sendReqForUserOpenid")
+	@ResponseBody
+	public synchronized void sendReqForUserOpenid(HttpServletRequest request, HttpServletResponse response){
+		System.out.println("@@/weixin/sendReqForUserOpenid");
+		String appid = WeiXinConstants.ORIGINAL_APPID;
+		String backUri = "http://www.g58mall.com/SellRobotSys/weixin/getUserOpenid";
+		try {
+			backUri = URLEncoder.encode(backUri, "UTF-8");
+			String url = "https://open.weixin.qq.com/connect/oauth2/authorize?" +
+					"appid=" + appid+
+					"&redirect_uri=" +
+					 backUri+
+					"&response_type=code&scope=snsapi_base&state=123#wechat_redirect";
+			response.sendRedirect(url);
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}		
+	}
+	/**
+	 * 获取用户openid微信服务器调用的接口
+	 * */
+	@RequestMapping("/getUserOpenid")
+	@ResponseBody
+	public synchronized void getUserOpenid(HttpServletRequest request, HttpServletResponse response){		
+		String code = request.getParameter("code");//微信返回的code
+		System.out.println("@@获取Original微信openid微信服务器返回code = " + code);
+		if(code == null){
+			System.out.println("@@获取用户Openid失败");
+			return;
+		}
+		String appid = WeiXinConstants.ORIGINAL_APPID;
+		String appsecret = WeiXinConstants.ORIGINAL_APPSECRET;
+		//使用code换取access_token、openid等，access_token+openid可以用来换取用户个人详细信息
+		Map<String, String> map1 = WeiXinUtils.getAccessTokenAndOpenid(code);
+		System.out.println("@@获取original_openid返回对象 = " + map1);
+		String openId = map1.get("openid");
+		String access_token = map1.get("access_token");
+		
+		//使用access_token和openid获取用户基本信息		
+		String URL_getUserInfo = "https://api.weixin.qq.com/sns/userinfo?access_token="+access_token+"&openid="+openId+"&lang=zh_CN";
+		Map<String, String> map = CommonUtils.httpsRequest(URL_getUserInfo, "GET", null);
+		// System.out.println("@@获取original_用户基本信息 = " + map);
+		
+		//如果不能成功获取用户个人信息
+		try {
+			if(map.get("errcode") != null && map.get("errmsg") != null){
+				//说明未关注公众号,使用snsapi_userinfo重新请求
+				String backUrl = "http://www.g58mall.com/SellRobotSys/weixin/getUserOpenid";
+				backUrl = URLEncoder.encode(backUrl, "UTF-8");
+				//scope 参数视各自需求而定，这里用scope=snsapi_base    snsapi_userinfo不弹出授权页面直接授权目的只获取统一支付接口的openid
+				String url = "https://open.weixin.qq.com/connect/oauth2/authorize?" +
+						"appid=" + appid+
+						"&redirect_uri=" +
+						 backUrl+
+						"&response_type=code&scope=snsapi_userinfo&state=123#wechat_redirect";
+				response.sendRedirect(url);
+				return;
+			}
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		String openid = map.get("openid");
+		UserWeixinOriginal userWX = userService.getOriginalUserByOpenid(openid);
+		if(userWX != null){
+			//更新用户信息
+			System.out.println("@@Original微信更新用户信息 nickname = " + map.get("nickname"));
+			userWX.setCity(map.get("city"));
+			userWX.setHeadimageurl(map.get("headimgurl"));
+			userWX.setNickname(EmojiUtil.emojiConvert(map.get("nickname"))); // 将昵称进行转换
+			userWX.setOpenid(openid);
+			userWX.setProvince(map.get("province"));
+			userWX.setSex(map.get("gender"));
+			userWX.setCanRecvAdminInfo(true);
+			userWX.setDate(new Date());
+			userService.updateWeixinUserOriginal(userWX);
+		}else {
+			System.out.println("@@Original微信新增扫码用户 nickname = " + map.get("nickname"));
+			userWX = new UserWeixinOriginal(openid,
+					EmojiUtil.emojiConvert(map.get("nickname")),
+					map.get("gender"),
+					map.get("province"),
+					map.get("city"),
+					map.get("headimgurl"));
+			userWX.setCanRecvAdminInfo(true);
+			userWX.setDate(new Date());
+			userService.saveWeixinUserOriginal(userWX);
+		}			
+		
+		try {
+			request.getRequestDispatcher("/wx/bindAdminInfoOK.jsp").forward(request, response);
+		} catch (ServletException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }

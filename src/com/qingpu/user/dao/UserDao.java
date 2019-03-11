@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.qingpu.user.entity.User;
 import com.qingpu.user.entity.UserWeixin;
+import com.qingpu.user.entity.UserWeixinOriginal;
 
 public interface UserDao {
 	List<User> getUserByUsername(String username);
@@ -19,4 +20,12 @@ public interface UserDao {
 	void updateWeixinUser(UserWeixin userWX);
 
 	void saveWeixinUser(UserWeixin userWX);
+
+	List<UserWeixinOriginal> getOriginalUserByOpenId(String openid);
+
+	void updateWeixinUserOriginal(UserWeixinOriginal userWX);
+
+	void saveWeixinUserOriginal(UserWeixinOriginal userWX);
+
+	List<UserWeixinOriginal> getOriginalUserCanRecvAdminInfo();
 }

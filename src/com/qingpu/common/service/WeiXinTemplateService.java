@@ -12,9 +12,14 @@ public abstract interface WeiXinTemplateService {
 	String getTemplateList();
 	
 	/**
-	 * 发送模板消息
+	 * 向指定openid用户发送模板消息
 	 * @param recvMessageOpenid 
 	 * */
 	String sendTemplateMessage(String json, String recvMessageOpenid);
+	
+	/**
+	 * 向特定的用户发送模板消息
+	 * */
+	void sendTemplateMessageToUniqueUser(String message);
 	
 }

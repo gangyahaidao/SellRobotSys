@@ -51,7 +51,7 @@ public class WeiXinUtils {
 	public synchronized static Map<String, String> getAccessTokenAndOpenid(String code){
 		Map<String, String> result = new HashMap<String, String>();
 		
-		String accessTokenUrl = String.format(WeiXinConstants.ACCESSTOKEN_OPENID, WeiXinConstants.APPID, WeiXinConstants.APPSECRET, code);
+		String accessTokenUrl = String.format(WeiXinConstants.ACCESSTOKEN_OPENID, WeiXinConstants.ORIGINAL_APPID, WeiXinConstants.ORIGINAL_APPSECRET, code);
 		MAP = CommonUtils.httpsRequest(accessTokenUrl, "GET", null);
 		lastTime = new Date();
 		result.put("access_token", MAP.get("access_token"));
@@ -85,17 +85,21 @@ public class WeiXinUtils {
 			accessTokenObj.setExpires_in(Integer.parseInt(expires_in));
 		}else{
 			try {
-				String accessTokenUrl = String.format(WeiXinConstants.ACCESS_TOKEN_URL, WeiXinConstants.APPID, WeiXinConstants.APPSECRET);
+				String accessTokenUrl = String.format(WeiXinConstants.ACCESS_TOKEN_URL, WeiXinConstants.ORIGINAL_APPID, WeiXinConstants.ORIGINAL_APPSECRET);				
 				MAPJSSDK = CommonUtils.httpsRequest(accessTokenUrl, "GET", null);
 				lastTimeJSSDK = new Date();		
 				
-				accessTokenObj.setAccess_token(MAPJSSDK.get("access_token"));
-				accessTokenObj.setExpires_in(Integer.parseInt(MAPJSSDK.get("expires_in")));
+				if(MAPJSSDK.get("access_token") != null) {
+					accessTokenObj.setAccess_token(MAPJSSDK.get("access_token"));
+					accessTokenObj.setExpires_in(Integer.parseInt(MAPJSSDK.get("expires_in")));
+				} else {
+					System.out.println("@@请求错误access_token返回值 = " + MAPJSSDK);
+					System.out.println("@@获取access_token失败");
+					return null;
+				}			
 			} catch (JSONException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}

@@ -3,7 +3,10 @@ package com.qingpu.common.utils;
  * 主要是存放微信相关的常量
  * */
 public class WeiXinConstants {
-	public static final String APPID = "wx8632f39e7c81a6b3";
+	public static final String ORIGINAL_APPID = "wxefee5a4d8684fe7c"; // 微信服务号原来的appid和secret
+	public static final String ORIGINAL_APPSECRET = "3aec5a64f46ee29fbe7ed2b3ac1aea36";
+	
+	public static final String APPID = "wx8632f39e7c81a6b3"; // 小程序提供的appid与secret，与小程序对接使用支付功能
 	public static final String APPSECRET = "338343c63fb9b95d8f71650dab617f69";
 	
 	public static final String PARTNER = "1485136602";	
