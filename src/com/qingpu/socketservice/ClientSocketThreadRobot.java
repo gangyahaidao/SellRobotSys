@@ -11,14 +11,17 @@ import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.qingpu.common.service.WeiXinTemplateService;
 import com.qingpu.common.utils.DataProcessUtils;
 import com.qingpu.common.utils.QingpuConstants;
 
 public class ClientSocketThreadRobot extends Thread {
 	private Socket client;
+	private WeiXinTemplateService weiXinTemplateService;
 
-	public ClientSocketThreadRobot(Socket client) {
+	public ClientSocketThreadRobot(Socket client, WeiXinTemplateService weiXinTemplateService) {
 		this.client = client;
+		this.weiXinTemplateService = weiXinTemplateService;
 	}
 
 	@Override
@@ -155,6 +158,7 @@ public class ClientSocketThreadRobot extends Thread {
 							if(carOnePosPercent == 100) { // 如果到达了某点
 								String carOneEndPosName = jsonObj.getString("carOneEndPosName");
 								System.out.println("@@到达中途地点 = " + carOneEndPosName);	
+								weiXinTemplateService.sendTemplateMessageToUniqueUser("到达中途点：" + carOneEndPosName);
 								clientObj.setCurrentPosName(carOneEndPosName); // 设置当前到达的中间点
 								// 向底盘发送停止命令，同时设置底盘的标志位到达某点为true，此段时间不响应人体检测的move命令								
 								DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
@@ -250,6 +254,7 @@ public class ClientSocketThreadRobot extends Thread {
 							String currentPosName = jsonObject.getString("reachedPosName");
 							System.out.println("@@到达最终点 = " + currentPosName);
 							clientObj.setCurrentPosName(currentPosName);// 设置机器人当前的路径点名称
+							weiXinTemplateService.sendTemplateMessageToUniqueUser("到达当前行走路径终点：" + currentPosName);
 
 							// 判断机器人是否需要补货
 							String machineId = clientObj.getMachineID();
@@ -258,6 +263,7 @@ public class ClientSocketThreadRobot extends Thread {
 								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点与设置的路径起始点一样，则通知管理员开始补货
 									clientObj.setHasRobotReachedGoal(false); // 缺货时设置机器人处于忙状态，不响应路径控制命令 
 									int delayCount = 0;
+									weiXinTemplateService.sendTemplateMessageToUniqueUser("零售商品不足，请及时补货");
 									ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "呼叫，呼叫，货柜商品不足，管理员同志快来给我补货吧"); // 进行语音播报
 									while(containerClient.isRobotOutOfStore()){
 										if(delayCount >= 2*30) {
@@ -272,6 +278,7 @@ public class ClientSocketThreadRobot extends Thread {
 											e.printStackTrace();
 										}
 									}
+									ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "补货完成继续行走");
 									System.out.println("@@补货完成继续检测循环行走");
 								}											
 							} else {

@@ -64,8 +64,6 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 	private RobotsDao robotDao;
 	@Resource
 	private GoodsService goodsService;
-	@Resource
-	WeiXinTemplateService weiXinTemplateService;
 	
 	/**
 	 * 扫码获取机器人商品列表

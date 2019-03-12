@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 
 import org.json.JSONObject;
 
+import com.qingpu.common.service.WeiXinTemplateService;
 import com.qingpu.common.utils.QingpuConstants;
 
 /**
@@ -21,13 +22,15 @@ import com.qingpu.common.utils.QingpuConstants;
 public class ServerSocketThreadRobot extends Thread{
 	private ServerSocket serverSocket;
 	private static final int SERVERPORT = 8089;
+	private WeiXinTemplateService weiXinTemplateService;
 	
 	public static Map<String, RobotClientSocket> robotMachineMap = new HashMap<String, RobotClientSocket>(); // 用于存储售货机器人底盘的socket连接，key值为底盘初次连接上传测注册字符串（楼层+机器人编号）
 	
-	public ServerSocketThreadRobot(){
+	public ServerSocketThreadRobot(WeiXinTemplateService weiXinTemplateService){
 		try {
 			if (null == serverSocket) {
 				this.serverSocket = new ServerSocket(SERVERPORT); // "120.24.175.156", 8089
+				this.weiXinTemplateService = weiXinTemplateService;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -135,7 +138,7 @@ public class ServerSocketThreadRobot extends Thread{
 				Socket client = serverSocket.accept();//阻塞等待客户端的连接
 				client.setTcpNoDelay(true);//立即发送数据
 				client.setKeepAlive(true);//当长时间未能发送数据，服务器主动断开连接
-				ClientSocketThreadRobot client_thread = new ClientSocketThreadRobot(client);
+				ClientSocketThreadRobot client_thread = new ClientSocketThreadRobot(client, weiXinTemplateService);
 				client_thread.start();
 			}
 		} catch (IOException e) {
