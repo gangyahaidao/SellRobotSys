@@ -14,8 +14,15 @@ public class DetectClientSocket {
 	private ClientSocketThreadDetect clientThread; // 连接子线程
 	private String machineID; // 机器人编号
 	private Date preDate; // 接收上一次心跳的时间
+	private boolean isTimeout; // 心跳是否超时了
 	private boolean reachedGoalNeedStop; // 到达了某点是否需要不响应继续行走命令
 	
+	public boolean isTimeout() {
+		return isTimeout;
+	}
+	public void setTimeout(boolean isTimeout) {
+		this.isTimeout = isTimeout;
+	}
 	public Socket getClient() {
 		return client;
 	}

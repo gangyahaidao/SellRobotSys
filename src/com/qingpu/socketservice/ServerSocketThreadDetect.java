@@ -444,9 +444,12 @@ public class ServerSocketThreadDetect extends Thread {
 						String key = entry.getKey();//机器编号
 						DetectClientSocket beat = entry.getValue();
 						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*5){ //秒
-							beat.getClientThread().closeClient();//关闭连接socket和释放线程							
-							// it.remove();//从在线列表中移除
-							// System.out.println("@@人体识别线程心跳超时，移除客户端 machineID = " + key);
+							if(!beat.isTimeout()) { // 如果还没有设置超时
+								beat.setTimeout(true);
+								beat.getClientThread().closeClient();//关闭连接socket和释放线程
+								//it.remove();//从在线列表中移除
+								System.out.println("@@人体识别控制线程心跳超时，移除客户端 machineID = " + key);
+							}							
 						}
 					}
 				}

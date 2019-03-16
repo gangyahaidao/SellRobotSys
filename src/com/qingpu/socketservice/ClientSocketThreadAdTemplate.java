@@ -81,8 +81,16 @@ public class ClientSocketThreadAdTemplate extends Thread {
 							if(adClient != null) {
 								adClient.setPreDate(new Date());
 								adClient.setClient(getClient());
-								ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
+								adClient.setClientThread(this);
+							} else {
+								adClient = new AdTemplateClientSocket();
+								adClient.setClient(getClient());
+								adClient.setClientThread(this);
+								adClient.setMachineID(machineId);
+								adClient.setPreDate(new Date());								
 							}
+							adClient.setTimeout(false);
+							ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
 						} else if("getRobotsGoodsJSONObj".equals(cmdStr)) { // 获取指定编号机器人上的商品列表
 							ReturnObject retObj = new ReturnObject();
 							Robot robot = robotDao.getRobotByMachineId(machineId);							
@@ -145,7 +153,6 @@ public class ClientSocketThreadAdTemplate extends Thread {
 				}											
 			}			
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

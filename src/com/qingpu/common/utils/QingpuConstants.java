@@ -50,7 +50,7 @@ public class QingpuConstants {
 	 * */
 	public static final int RECV_STOP_DELAY_TIME = 1000*15; // 持续接收到停止命令停止的时间
 	public static final int RECV_STOP_DELAY_GOON = 1000*8; // 停止超时之后继续运动的时间
-	public static final int RECV_MOVE_CONTINUE_TIME = 1000*50; // 自由巡逻状态下每隔此时间则查找一个对话进行播放
+	public static final int RECV_MOVE_CONTINUE_TIME = 1000*60; // 自由巡逻状态下每隔此时间则查找一个对话进行播放
 	public static final int SCANQR_OVERFLOW_TIME = 25; // 秒，扫码未付款超时的时间
 
 }

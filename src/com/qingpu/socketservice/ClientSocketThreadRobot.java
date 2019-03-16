@@ -26,8 +26,7 @@ public class ClientSocketThreadRobot extends Thread {
 
 	@Override
 	public void run() {
-		System.out.println("@@连接零售机器人底盘客户端信息: ip = " + client.getInetAddress() + ", port = " + client.getPort() 
-				+ ", time = " + new Date() + ", thread = " + this.getName());
+		System.out.println("@@连接零售机器人底盘客户端信息: ip = " + client.getInetAddress() + ", port = " + client.getPort() + ", time = " + new Date() + ", thread = " + this.getName());
 		try {
 			InputStream in = client.getInputStream();
 			byte[] result = new byte[0];
@@ -48,7 +47,7 @@ public class ClientSocketThreadRobot extends Thread {
 							header = true;
 						}else{//收到结束字节
 							tailer = true;
-						}											
+						}
 					}
 					result = DataProcessUtils.appendByte(result, b);
 					if(header &&  tailer){//如果既收到头又收到尾，则收到一条完整信息，开始处理
@@ -60,9 +59,9 @@ public class ClientSocketThreadRobot extends Thread {
 				}
 			}			
 		} catch (IOException e) {
-			e.printStackTrace();			
+			System.out.println("@@底盘连接socket断开 = " + e.getMessage());
 		}
-	}	
+	}
 
 	/**
 	 * 从接受的数据中解析出消息体，并根据加密方式进行解密，返回解密之后的数据
@@ -137,21 +136,22 @@ public class ClientSocketThreadRobot extends Thread {
 							System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源");
 							clientObj.setClient(this.client);
 							clientObj.setClientThread(this);
-							clientObj.setPreDate(new Date());
+							clientObj.setPreDate(new Date());							
 						} else {
 							System.out.println("@@收到底盘第一次注册消息");
 							clientObj = new RobotClientSocket();
 							clientObj.setClient(this.client);
 							clientObj.setClientThread(this);
 							clientObj.setMachineID(registerCode);
-							clientObj.setPreDate(new Date());							
+							clientObj.setPreDate(new Date());
 							clientObj.setHasRobotReachedGoal(true); // 设置机器人初始连接处于空闲状态
-						}						
+						}
+						clientObj.setTimeout(false);
 						ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);
 					} else if(cmd == QingpuConstants.RECV_ROBOT_POS_SPEED){ // 接收机器人发送的位置和速度消息
 						RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(this.client);
 						if(clientObj != null) {
-							System.out.println("@@RECV_ROBOT_POS_SPEED = " + new String(content));
+							// System.out.println("@@RECV_ROBOT_POS_SPEED = " + new String(content));
 							JSONObject jsonObj = new JSONObject(new String(content));
 							clientObj.setRecvRobotPosAndSpeedObj(jsonObj); // 设置机器人底盘上报的速度和路段信息
 							int carOnePosPercent = jsonObj.getInt("carOnePosPercent");

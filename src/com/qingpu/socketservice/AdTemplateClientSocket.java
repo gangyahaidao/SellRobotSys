@@ -8,7 +8,14 @@ public class AdTemplateClientSocket {
 	private ClientSocketThreadAdTemplate clientThread; // 连接子线程
 	private String machineID; // 机器人编号
 	private Date preDate; // 接收上一次心跳的时间
+	private boolean isTimeout;
 	
+	public boolean isTimeout() {
+		return isTimeout;
+	}
+	public void setTimeout(boolean isTimeout) {
+		this.isTimeout = isTimeout;
+	}
 	public Socket getClient() {
 		return client;
 	}

@@ -66,9 +66,11 @@ public class ClientSocketThreadDetect extends Thread {
 								detectClient.setClient(this.client);
 								detectClient.setPreDate(new Date());
 								detectClient.setClientThread(this);
-							}														
-							ServerSocketThreadDetect.detectMachineMap.put(machineId, detectClient);							
+							}
+							detectClient.setTimeout(false);
+							ServerSocketThreadDetect.detectMachineMap.put(machineId, detectClient);
 						} else if("heartbeat".equals(detectStr)) {
+							System.out.println("@@收到人体检测控制心跳");
 							DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
 							if(detectObj != null) {
 								detectObj.setPreDate(new Date());
@@ -146,7 +148,7 @@ public class ClientSocketThreadDetect extends Thread {
 				}
 			}		
 		} catch (IOException e) {
-			System.out.println("@@SellRobotSysget this.isInterrupted() signal, clear thread  = " + e.getMessage());			
+			System.out.println("@@人体检测控制socket连接断开  = " + e.getMessage());			
 		}
 	}
 	

@@ -10,7 +10,8 @@ public class ContainerClientSocket {
 	private ClientSocketThread clientThread; // 连接子线程
 	private String machineID; // 机器人编号
 	private Date preDate; // 接收上一次心跳的时间
-	
+	private boolean isTimeout; // 当前socket连接是否超时标识，如果超时置位此值同时关闭对应的socket和线程，下次超时检测时不再进行关闭
+		
 	private boolean isDoorOpened = false; // 出货的货柜门是否处于开启状态
 	private boolean isDeviceBusy = false;//售卖货柜是否处于忙状态
 	private String currentOrderId = null; // 当前售货柜正在处理的订单对象
@@ -18,6 +19,12 @@ public class ContainerClientSocket {
 	private boolean isInBuyGoodsProcess = false; // 标识是否用户已经进行了付款，如果有人在购买则不响应人体检测的行走move命令
 	private boolean isRobotOutOfStore = false; // 机器人是否处于缺货状态，用于每次在出完货之后进行检查，与数据库中的状态同步
 	
+	public boolean isTimeout() {
+		return isTimeout;
+	}
+	public void setTimeout(boolean isTimeout) {
+		this.isTimeout = isTimeout;
+	}	
 	public Socket getClient() {
 		return client;
 	}

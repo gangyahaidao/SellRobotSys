@@ -78,6 +78,7 @@ public class ClientSocketThread extends Thread {
 								clientSocket.setDoorOpened(true); // 门被打开拿走了东西
 							}
 						} else if("heartbeat".equals(content)) { // 收到心跳消息
+							System.out.println("@@收到货柜串口心跳");
 							ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(this.client);
 							if(clientSocket != null) {
 								clientSocket.setPreDate(new Date());// 更新心跳时间，防止超时被断开
@@ -85,13 +86,22 @@ public class ClientSocketThread extends Thread {
 								ServerSocketThread.containerMachineMap.put(clientSocket.getMachineID(), clientSocket);//直接进行覆盖添加
 							}				
 						} else if(CommonUtils.isNumber(content)){ // 心跳数据只是一个数字字符串
-							System.out.println("@@收到货柜注册消息");
-							ContainerClientSocket clientSocket = new ContainerClientSocket();
-							clientSocket.setClient(this.client);
-							clientSocket.setClientThread(this);
-							clientSocket.setMachineID(content);
-							clientSocket.setPreDate(new Date());
-							ServerSocketThread.containerMachineMap.put(content, clientSocket);								
+							ContainerClientSocket containerSocket = ServerSocketThread.containerMachineMap.get(content); 
+							if(containerSocket != null) {
+								System.out.println("@@收到货柜串口断开后的注册消息");
+								containerSocket.setClient(getClient());
+								containerSocket.setClientThread(this);
+								containerSocket.setPreDate(new Date());								
+							} else {
+								System.out.println("@@收到货柜串口第一次注册消息");
+								containerSocket = new ContainerClientSocket();
+								containerSocket.setClient(this.client);
+								containerSocket.setClientThread(this);
+								containerSocket.setMachineID(content);
+								containerSocket.setPreDate(new Date());
+							}
+							containerSocket.setTimeout(false); // 设置为没有超时状态
+							ServerSocketThread.containerMachineMap.put(content, containerSocket);
 							new ProcessSellGoodsClientThread().start(); // 货柜注册之后再启动监听出货线程
 						} else {
 							System.out.println("@@收到货柜其他消息 = " + content);
@@ -104,7 +114,7 @@ public class ClientSocketThread extends Thread {
 				}
 			}		
 		} catch (IOException e) {
-			System.out.println("@@SellRobotSysget this.isInterrupted() signal, clear thread  = " + e.getMessage());			
+			System.out.println("@@货柜连接socket连接断开  = " + e.getMessage());
 		}
 	}
 	
@@ -368,9 +378,9 @@ public class ClientSocketThread extends Thread {
 	}
 
 	// 关闭连接socket和销毁线程
-	public void closeClient() {
+	public void closeClient() {		
 		try {
-			this.interrupt();
+			this.interrupt(); // 关闭当前线程
 			if (client != null) {
 				if(!client.isClosed()){
 					client.getInputStream().close();
@@ -383,7 +393,6 @@ public class ClientSocketThread extends Thread {
 				}											
 			}			
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

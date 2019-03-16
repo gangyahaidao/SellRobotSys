@@ -19,6 +19,7 @@ public class RobotClientSocket {
 	private ClientSocketThreadRobot clientThread; // 连接子线程
 	private String machineID; // 机器人编号
 	private Date preDate; // 接收上一次心跳的时间
+	private boolean isTimeout;
 
 	private JSONObject recvRobotPosAndSpeedObj; // 存储底盘上传的位置速度信息
 	private boolean hasRobotReachedGoal; // 初始处于空闲状态
@@ -42,7 +43,12 @@ public class RobotClientSocket {
 	public void setCurrentPosObj(JSONObject currentPosObj) {
 		this.currentPosObj = currentPosObj;
 	}
-	
+	public boolean isTimeout() {
+		return isTimeout;
+	}
+	public void setTimeout(boolean isTimeout) {
+		this.isTimeout = isTimeout;
+	}
 	public Socket getClient() {
 		return client;
 	}
