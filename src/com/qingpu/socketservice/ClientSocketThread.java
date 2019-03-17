@@ -78,30 +78,34 @@ public class ClientSocketThread extends Thread {
 								clientSocket.setDoorOpened(true); // 门被打开拿走了东西
 							}
 						} else if("heartbeat".equals(content)) { // 收到心跳消息
-							System.out.println("@@收到货柜串口心跳");
-							ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(this.client);
-							if(clientSocket != null) {
-								clientSocket.setPreDate(new Date());// 更新心跳时间，防止超时被断开
-								clientSocket.setClient(this.getClient());
-								ServerSocketThread.containerMachineMap.put(clientSocket.getMachineID(), clientSocket);//直接进行覆盖添加
-							}				
+							// System.out.println("@@收到货柜串口心跳");
+							synchronized (ServerSocketThread.containerMachineMap){
+								ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(this.client);
+								if(clientSocket != null) {
+									clientSocket.setPreDate(new Date());// 更新心跳时间，防止超时被断开
+									clientSocket.setClient(this.getClient());
+									ServerSocketThread.containerMachineMap.put(clientSocket.getMachineID(), clientSocket);//直接进行覆盖添加
+								}	
+							}									
 						} else if(CommonUtils.isNumber(content)){ // 心跳数据只是一个数字字符串
-							ContainerClientSocket containerSocket = ServerSocketThread.containerMachineMap.get(content); 
-							if(containerSocket != null) {
-								System.out.println("@@收到货柜串口断开后的注册消息");
-								containerSocket.setClient(getClient());
-								containerSocket.setClientThread(this);
-								containerSocket.setPreDate(new Date());								
-							} else {
-								System.out.println("@@收到货柜串口第一次注册消息");
-								containerSocket = new ContainerClientSocket();
-								containerSocket.setClient(this.client);
-								containerSocket.setClientThread(this);
-								containerSocket.setMachineID(content);
-								containerSocket.setPreDate(new Date());
-							}
-							containerSocket.setTimeout(false); // 设置为没有超时状态
-							ServerSocketThread.containerMachineMap.put(content, containerSocket);
+							synchronized (ServerSocketThread.containerMachineMap){
+								ContainerClientSocket containerSocket = ServerSocketThread.containerMachineMap.get(content); 
+								if(containerSocket != null) {
+									System.out.println("@@收到货柜串口断开后的注册消息");
+									containerSocket.setClient(getClient());
+									containerSocket.setClientThread(this);
+									containerSocket.setPreDate(new Date());								
+								} else {
+									System.out.println("@@收到货柜串口第一次注册消息");
+									containerSocket = new ContainerClientSocket();
+									containerSocket.setClient(this.client);
+									containerSocket.setClientThread(this);
+									containerSocket.setMachineID(content);
+									containerSocket.setPreDate(new Date());
+								}
+								containerSocket.setTimeout(false); // 设置为没有超时状态
+								ServerSocketThread.containerMachineMap.put(content, containerSocket);
+							}							
 							new ProcessSellGoodsClientThread().start(); // 货柜注册之后再启动监听出货线程
 						} else {
 							System.out.println("@@收到货柜其他消息 = " + content);
@@ -126,11 +130,14 @@ public class ClientSocketThread extends Thread {
 			
 			ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(getClient());			
 			int scanDelayCount = 0;
-			while(true){	
+			while(true){
 				try {
 					Thread.sleep(50);
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
+				}
+				if(clientSocket.isTimeout()) { // 如果货柜连接socket断开，则此监听线程也退出
+					break;
 				}
 				
 				if(clientSocket.isCustomScanQrCode()) { // 如果用户进行了扫码则停止并开始计时
@@ -374,6 +381,7 @@ public class ClientSocketThread extends Thread {
 					}
 				}				
 			}
+			System.out.println("@@关闭货柜出货监听线程");
 		}
 	}
 

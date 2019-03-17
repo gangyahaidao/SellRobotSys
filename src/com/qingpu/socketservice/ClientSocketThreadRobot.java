@@ -109,45 +109,49 @@ public class ClientSocketThreadRobot extends Thread {
 					if(cmd == QingpuConstants.RECV_HEART_BEAT) { // 接收到底盘的心跳
 						JSONObject jsonobj = new JSONObject(new String(content));
 						String machineId = jsonobj.getString("machineId");
-						RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
-						if(clientObj != null) {
-							clientObj.setPreDate(new Date());
-							clientObj.setClient(this.getClient());
-							ServerSocketThreadRobot.robotMachineMap.put(machineId, clientObj);
-							// 返回一个心跳包给客户端
-							JSONObject retJsonObj = new JSONObject();
-							retJsonObj.put("machineId", "3");
-							ResponseSocketUtils.sendJsonDataToClient(
-									retJsonObj, 
-									this.getClient(),
-									QingpuConstants.SEND_BACK_HEART_BEAT,
-									QingpuConstants.ENCRYPT_BY_NONE,
-									QingpuConstants.DATA_TYPE_JSON);
-						} else {
-							System.out.println("@@收到心跳，但是底盘连接通道被定时器断开");
-						}						
+						synchronized (ServerSocketThreadRobot.robotMachineMap) {
+							RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(machineId);
+							if(clientObj != null) {
+								clientObj.setPreDate(new Date());
+								clientObj.setClient(this.getClient());
+								ServerSocketThreadRobot.robotMachineMap.put(machineId, clientObj);
+								// 返回一个心跳包给客户端
+								JSONObject retJsonObj = new JSONObject();
+								retJsonObj.put("machineId", "3");
+								ResponseSocketUtils.sendJsonDataToClient(
+										retJsonObj, 
+										this.getClient(),
+										QingpuConstants.SEND_BACK_HEART_BEAT,
+										QingpuConstants.ENCRYPT_BY_NONE,
+										QingpuConstants.DATA_TYPE_JSON);
+							} else {
+								System.out.println("@@收到心跳，但是底盘连接通道被定时器断开");
+							}	
+						}										
 					} else if (cmd == QingpuConstants.RECV_ROBOT_REGISTER_CODE) { // 接收到机器人的初始注册信息
-						System.out.println("@@收到底盘机器人注册消息 = " + new String(content));
-						JSONObject jsonobj = new JSONObject(new String(content));
-						String registerCode = jsonobj.getString("registerCode");
-						RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(registerCode);
-						if(clientObj != null) { // 如果前面连接的线程还没有释放，则先释放原来的线程
-							clientObj.getClientThread().closeClient();
-							System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源");
-							clientObj.setClient(this.client);
-							clientObj.setClientThread(this);
-							clientObj.setPreDate(new Date());							
-						} else {
-							System.out.println("@@收到底盘第一次注册消息");
-							clientObj = new RobotClientSocket();
-							clientObj.setClient(this.client);
-							clientObj.setClientThread(this);
-							clientObj.setMachineID(registerCode);
-							clientObj.setPreDate(new Date());
-							clientObj.setHasRobotReachedGoal(true); // 设置机器人初始连接处于空闲状态
-						}
-						clientObj.setTimeout(false);
-						ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);
+						synchronized (ServerSocketThreadRobot.robotMachineMap) {
+							System.out.println("@@收到底盘机器人注册消息 = " + new String(content));
+							JSONObject jsonobj = new JSONObject(new String(content));
+							String registerCode = jsonobj.getString("registerCode");
+							RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(registerCode);
+							if(clientObj != null) { // 如果前面连接的线程还没有释放，则先释放原来的线程
+								clientObj.getClientThread().closeClient();
+								System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源");
+								clientObj.setClient(this.client);
+								clientObj.setClientThread(this);
+								clientObj.setPreDate(new Date());							
+							} else {
+								System.out.println("@@收到底盘第一次注册消息");
+								clientObj = new RobotClientSocket();
+								clientObj.setClient(this.client);
+								clientObj.setClientThread(this);
+								clientObj.setMachineID(registerCode);
+								clientObj.setPreDate(new Date());
+								clientObj.setHasRobotReachedGoal(true); // 设置机器人初始连接处于空闲状态
+							}
+							clientObj.setTimeout(false);
+							ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);
+						}						
 					} else if(cmd == QingpuConstants.RECV_ROBOT_POS_SPEED){ // 接收机器人发送的位置和速度消息
 						RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(this.client);
 						if(clientObj != null) {

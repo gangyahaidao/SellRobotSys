@@ -121,6 +121,27 @@ public class ServerSocketThreadDetect extends Thread {
 			e.printStackTrace();
 		}
 	}
+	/**
+	 * 发送回复心跳到连接客户端
+	 * */
+	public static void sendHeartbeatToDetectSocket(String machineId) {
+		try {
+			DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(machineId);
+			if(detectClient != null && detectClient.getClient().isOutputShutdown() == false) {
+				OutputStream out = detectClient.getClient().getOutputStream();
+				JSONObject obj = new JSONObject();
+				obj.put("Back-HB", 1);
+				out.write(obj.toString().getBytes());
+				out.flush();
+			}else{
+				System.out.println("@@人体检测socket断开连接");
+			}			
+		} catch (JSONException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	/**
 	 * 根据当前的时间返回对话模板中时间的字符串变量

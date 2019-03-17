@@ -51,32 +51,38 @@ public class ClientSocketThreadDetect extends Thread {
 						String detectStr = jsonObj.getString("detectStr"); // 人体检测内容
 												
 						if("register".equals(detectStr)) { // 收到人体检测的注册消息  register
-							System.out.println("@@人体检测收到注册数据 = " + content);							
-							DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(machineId);
-							if(detectClient == null) {
-								System.out.println("@@第一次收到人体检测的注册消息");
-								detectClient = new DetectClientSocket();
-								detectClient.setClient(this.client);
-								detectClient.setClientThread(this);
-								detectClient.setMachineID(machineId);
-								detectClient.setPreDate(new Date());								
-							} else {
-								System.out.println("@@收到人体检测断开重新注册的消息");
-								detectClient.getClientThread().closeClient();
-								detectClient.setClient(this.client);
-								detectClient.setPreDate(new Date());
-								detectClient.setClientThread(this);
-							}
-							detectClient.setTimeout(false);
-							ServerSocketThreadDetect.detectMachineMap.put(machineId, detectClient);
+							synchronized (ServerSocketThreadDetect.detectMachineMap) {
+								System.out.println("@@人体检测收到注册数据 = " + content);							
+								DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(machineId);
+								if(detectClient == null) {
+									System.out.println("@@第一次收到人体检测的注册消息");
+									detectClient = new DetectClientSocket();
+									detectClient.setClient(this.client);
+									detectClient.setClientThread(this);
+									detectClient.setMachineID(machineId);
+									detectClient.setPreDate(new Date());								
+								} else {
+									System.out.println("@@收到人体检测断开重新注册的消息");
+									detectClient.getClientThread().closeClient();
+									detectClient.setClient(this.client);
+									detectClient.setPreDate(new Date());
+									detectClient.setClientThread(this);
+								}
+								detectClient.setTimeout(false);
+								ServerSocketThreadDetect.detectMachineMap.put(machineId, detectClient);
+							}							
 						} else if("heartbeat".equals(detectStr)) {
-							System.out.println("@@收到人体检测控制心跳");
-							DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
-							if(detectObj != null) {
-								detectObj.setPreDate(new Date());
-								detectObj.setClient(this.client);
-								ServerSocketThreadDetect.detectMachineMap.put(machineId, detectObj); // 更新连接信息
-							}
+							synchronized (ServerSocketThreadDetect.detectMachineMap) {
+								// System.out.println("@@收到人体检测控制心跳");
+								DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
+								if(detectObj != null) {
+									detectObj.setPreDate(new Date());
+									detectObj.setClient(this.client);
+									ServerSocketThreadDetect.detectMachineMap.put(machineId, detectObj); // 更新连接信息
+								}
+								// 发送一个回复心跳
+								ServerSocketThreadDetect.sendHeartbeatToDetectSocket(machineId);
+							}							
 						} else if("stop".equals(detectStr)) { // 接收到人体检测的停止命令，感应状态没有切换的正常情况下两秒钟一次，如果有切换立即发送
 							preStopDate = new Date(); // 更新时间用于继续运动的时间检测
 							Date currentDate = new Date();

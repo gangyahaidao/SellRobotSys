@@ -69,28 +69,32 @@ public class ClientSocketThreadAdTemplate extends Thread {
 						String machineId = jsonObj.getString("machineId"); // 人体检测对应的编号
 						String cmdStr = jsonObj.getString("cmdStr");
 						if("register".equals(cmdStr)) { // 收到注册消息
-							System.out.println("@@广告模板收到注册数据machineId = " + machineId);
-							AdTemplateClientSocket adClient = new AdTemplateClientSocket();
-							adClient.setClient(this.client);
-							adClient.setClientThread(this);
-							adClient.setMachineID(machineId);
-							adClient.setPreDate(new Date());
-							ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
-						} else if("heartbeat".equals(cmdStr)) { // 心跳消息
-							AdTemplateClientSocket adClient = ServerSocketThreadAD.adTemplateMap.get(machineId);
-							if(adClient != null) {
-								adClient.setPreDate(new Date());
-								adClient.setClient(getClient());
-								adClient.setClientThread(this);
-							} else {
-								adClient = new AdTemplateClientSocket();
-								adClient.setClient(getClient());
+							synchronized (ServerSocketThreadAD.adTemplateMap) {
+								System.out.println("@@广告模板收到注册数据machineId = " + machineId);
+								AdTemplateClientSocket adClient = new AdTemplateClientSocket();
+								adClient.setClient(this.client);
 								adClient.setClientThread(this);
 								adClient.setMachineID(machineId);
-								adClient.setPreDate(new Date());								
-							}
-							adClient.setTimeout(false);
-							ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
+								adClient.setPreDate(new Date());
+								ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
+							}							
+						} else if("heartbeat".equals(cmdStr)) { // 心跳消息
+							synchronized (ServerSocketThreadAD.adTemplateMap) {
+								AdTemplateClientSocket adClient = ServerSocketThreadAD.adTemplateMap.get(machineId);
+								if(adClient != null) {
+									adClient.setPreDate(new Date());
+									adClient.setClient(getClient());
+									adClient.setClientThread(this);
+								} else {
+									adClient = new AdTemplateClientSocket();
+									adClient.setClient(getClient());
+									adClient.setClientThread(this);
+									adClient.setMachineID(machineId);
+									adClient.setPreDate(new Date());								
+								}
+								adClient.setTimeout(false);
+								ServerSocketThreadAD.adTemplateMap.put(machineId, adClient);
+							}							
 						} else if("getRobotsGoodsJSONObj".equals(cmdStr)) { // 获取指定编号机器人上的商品列表
 							ReturnObject retObj = new ReturnObject();
 							Robot robot = robotDao.getRobotByMachineId(machineId);							
