@@ -81,7 +81,7 @@ public class ClientSocketThreadDetect extends Thread {
 									ServerSocketThreadDetect.detectMachineMap.put(machineId, detectObj); // 更新连接信息
 								}
 								// 发送一个回复心跳
-								ServerSocketThreadDetect.sendHeartbeatToDetectSocket(machineId);
+								ServerSocketThreadDetect.sendHeartbeatToDetectSocket(detectObj);
 							}							
 						} else if("stop".equals(detectStr)) { // 接收到人体检测的停止命令，感应状态没有切换的正常情况下两秒钟一次，如果有切换立即发送
 							preStopDate = new Date(); // 更新时间用于继续运动的时间检测

@@ -124,17 +124,17 @@ public class ServerSocketThreadDetect extends Thread {
 	/**
 	 * 发送回复心跳到连接客户端
 	 * */
-	public static void sendHeartbeatToDetectSocket(String machineId) {
+	public static void sendHeartbeatToDetectSocket(DetectClientSocket detectObj) {
 		try {
-			DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(machineId);
-			if(detectClient != null && detectClient.getClient().isOutputShutdown() == false) {
-				OutputStream out = detectClient.getClient().getOutputStream();
+			if(detectObj != null) {
+				OutputStream out = detectObj.getClient().getOutputStream();
 				JSONObject obj = new JSONObject();
 				obj.put("Back-HB", 1);
 				out.write(obj.toString().getBytes());
 				out.flush();
+				// System.out.println("@@回复人体检测心跳Back-HB");
 			}else{
-				System.out.println("@@人体检测socket断开连接");
+				System.out.println("@@发送心跳，人体检测socket断开连接");
 			}			
 		} catch (JSONException e) {
 			e.printStackTrace();
