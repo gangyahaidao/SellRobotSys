@@ -59,7 +59,7 @@ public class ClientSocketThreadRobot extends Thread {
 				}
 			}			
 		} catch (IOException e) {
-			System.out.println("@@底盘连接socket断开 = " + e.getMessage());
+			System.out.println("@@底盘连接socket断开 = " + e.getMessage() + ", this = " + this.getClient());
 		}
 	}
 
@@ -124,6 +124,7 @@ public class ClientSocketThreadRobot extends Thread {
 										QingpuConstants.SEND_BACK_HEART_BEAT,
 										QingpuConstants.ENCRYPT_BY_NONE,
 										QingpuConstants.DATA_TYPE_JSON);
+								// System.out.println("@@收到底盘心跳，并返回一个心跳");
 							} else {
 								System.out.println("@@收到心跳，但是底盘连接通道被定时器断开");
 							}	
@@ -135,11 +136,11 @@ public class ClientSocketThreadRobot extends Thread {
 							String registerCode = jsonobj.getString("registerCode");
 							RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(registerCode);
 							if(clientObj != null) { // 如果前面连接的线程还没有释放，则先释放原来的线程
-								clientObj.getClientThread().closeClient();
-								System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源");
+								clientObj.getClientThread().closeClient();								
+								System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源，新socket = " + this.client);								
+								clientObj.setPreDate(new Date());
 								clientObj.setClient(this.client);
 								clientObj.setClientThread(this);
-								clientObj.setPreDate(new Date());							
 							} else {
 								System.out.println("@@收到底盘第一次注册消息");
 								clientObj = new RobotClientSocket();
