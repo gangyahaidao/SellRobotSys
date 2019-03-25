@@ -26,7 +26,7 @@ public class ResponseSocketUtils {
 				// 清除连接的socket资源
 				RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(client);
 				clientObj.getClientThread().closeClient();
-				ServerSocketThreadRobot.robotMachineMap.remove(clientObj.getMachineID()); // 在Map中移除底盘对象
+				// ServerSocketThreadRobot.robotMachineMap.remove(clientObj.getMachineID()); // 在Map中移除底盘对象
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

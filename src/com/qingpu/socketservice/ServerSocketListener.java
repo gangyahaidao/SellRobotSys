@@ -41,15 +41,15 @@ public class ServerSocketListener implements ServletContextListener {
 			AdTemplateDao adTemplateDao = WebApplicationContextUtils.getWebApplicationContext(context).getBean(AdTemplateDao.class); // 广告模板数据读取
 			WeiXinTemplateService weiXinTemplateService = WebApplicationContextUtils.getWebApplicationContext(context).getBean(WeiXinTemplateService.class);
 			
-			socketService = new ServerSocketThread(goodsService, robotDao); // 启动货柜和人体检测ServerSocket
+			socketService = new ServerSocketThread(goodsService, robotDao, weiXinTemplateService); // 启动货柜ServerSocket
 			socketServiceRobot = new ServerSocketThreadRobot(weiXinTemplateService); // 启动底盘ServerSocket
 			socketServiceDetect = new ServerSocketThreadDetect(goodsService, robotDao); // 人体检测ServerSocket
-			socketServiceAd = new ServerSocketThreadAD(robotDao, adTemplateDao, goodsService);
+			// socketServiceAd = new ServerSocketThreadAD(robotDao, adTemplateDao, goodsService);
 			//启动主线程
 			socketService.start();
 			socketServiceRobot.start();
 			socketServiceDetect.start();
-			socketServiceAd.start();
+			// socketServiceAd.start();
         }
 	}
 }

@@ -73,7 +73,7 @@ public class ClientSocketThreadDetect extends Thread {
 							}							
 						} else if("heartbeat".equals(detectStr)) {
 							synchronized (ServerSocketThreadDetect.detectMachineMap) {
-								// System.out.println("@@收到人体检测控制心跳");
+								// System.out.println("@@收到人体检测控制心跳并回复一个心跳");
 								DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(machineId);
 								if(detectObj != null) {
 									detectObj.setPreDate(new Date());
@@ -129,8 +129,17 @@ public class ClientSocketThreadDetect extends Thread {
 							if(ServerSocketThreadDetect.detectMachineMap.get(machineId).isReachedGoalNeedStop() // 扫码超时检测是在货柜ClientSocketThread中进行检查的
 									|| (containerClient!=null && containerClient.isCustomScanQrCode())
 									|| (containerClient!=null && containerClient.isInBuyGoodsProcess())) { // 如果机器人到达了终点或者用户进行了扫码或者用户已经付款等待出货，则不响应继续运动命令
-								System.out.println("@@处于终点或者用户扫码或者买东西阶段，忽略行走检测");
+								if(ServerSocketThreadDetect.detectMachineMap.get(machineId).isReachedGoalNeedStop()) {
+									System.out.println("@@到达了中间点播报站点语音，停止响应行走命令");
+								}
+								if(containerClient.isCustomScanQrCode()) {
+									System.out.println("@@用户进行了扫码操作，停止响应行走命令");
+								}
+								if(containerClient.isInBuyGoodsProcess()) {
+									System.out.println("@@货柜处于用户购买进程，停止响应行走命令");
+								}
 								preStopDate = new Date(); // 更新停止的计时，为的是继续运动的时候不会马上播报自由巡逻状态下的对话
+								ServerSocketThreadRobot.sendMoveCmdToRoobt(machineId, true); // 发送停止命令
 							} else {
 								Date currentDate = new Date();
 								long deltaMilliSeconds = currentDate.getTime() - preStopDate.getTime();
@@ -152,15 +161,17 @@ public class ClientSocketThreadDetect extends Thread {
 						result = DataProcessUtils.appendByte(result, b);
 					}					
 				}
-			}		
+			}
+			System.out.println("@@人体检测主线程退出while(1)");
 		} catch (IOException e) {
-			System.out.println("@@人体检测控制socket连接断开  = " + e.getMessage());			
+			System.out.println("@@人体检测控制主线程接收socket连接断开  = " + e.getMessage());			
 		}
 	}
 	
 	// 关闭连接socket和销毁线程
 	public void closeClient() {
 		try {
+			System.out.println("@@人体检测线程关闭原来的主线程连接和线程资源");
 			this.interrupt();
 			if (client != null) {
 				if(!client.isClosed()){

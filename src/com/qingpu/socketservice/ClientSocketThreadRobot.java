@@ -18,6 +18,8 @@ import com.qingpu.common.utils.QingpuConstants;
 public class ClientSocketThreadRobot extends Thread {
 	private Socket client;
 	private WeiXinTemplateService weiXinTemplateService;
+	private int currentRecvCmd = 0; // 当前收到的命令类型
+	private String needProcessCmdContent = null; // 需要处理的命令字符串内容	
 
 	public ClientSocketThreadRobot(Socket client, WeiXinTemplateService weiXinTemplateService) {
 		this.client = client;
@@ -36,7 +38,7 @@ public class ClientSocketThreadRobot extends Thread {
 
 			while (!this.isInterrupted()) {
 				try {
-					Thread.sleep(50);
+					Thread.sleep(20);
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
 				}
@@ -58,7 +60,7 @@ public class ClientSocketThreadRobot extends Thread {
 					}					
 				}
 			}			
-		} catch (IOException e) {
+		} catch (IOException e) {			
 			System.out.println("@@底盘连接socket断开 = " + e.getMessage() + ", this = " + this.getClient());
 		}
 	}
@@ -136,8 +138,23 @@ public class ClientSocketThreadRobot extends Thread {
 							String registerCode = jsonobj.getString("registerCode");
 							RobotClientSocket clientObj = ServerSocketThreadRobot.robotMachineMap.get(registerCode);
 							if(clientObj != null) { // 如果前面连接的线程还没有释放，则先释放原来的线程
-								clientObj.getClientThread().closeClient();								
-								System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源，新socket = " + this.client);								
+								System.out.println("@@收到断开重新注册的消息，则先释放原来的Socket资源，新socket = " + this.client);
+								System.out.println("@@clientObj.getClientThread().procesCmdThread = " + clientObj.getProcesCmdThread());
+								if(clientObj.getProcesCmdThread() != null) {
+									System.out.println("@@上一个底盘命令消息监听线程还未退出， 等待关闭子线程退出");
+									clientObj.getProcesCmdThread().interrupt();
+									clientObj.setNeedStopChindThread(true);
+									while(clientObj.getProcesCmdThread() != null) {
+										try {
+											Thread.sleep(500);
+											System.out.println("@@procesCmdThread = " + clientObj.getProcesCmdThread());
+										} catch (InterruptedException e) {
+											e.printStackTrace();
+										}
+									}
+									System.out.println("@@关闭了命令处理子线程");
+								}
+								clientObj.getClientThread().closeClient();																							
 								clientObj.setPreDate(new Date());
 								clientObj.setClient(this.client);
 								clientObj.setClientThread(this);
@@ -151,298 +168,19 @@ public class ClientSocketThreadRobot extends Thread {
 								clientObj.setHasRobotReachedGoal(true); // 设置机器人初始连接处于空闲状态
 							}
 							clientObj.setTimeout(false);
-							ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);
-						}						
-					} else if(cmd == QingpuConstants.RECV_ROBOT_POS_SPEED){ // 接收机器人发送的位置和速度消息
-						RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(this.client);
-						if(clientObj != null) {
-							// System.out.println("@@RECV_ROBOT_POS_SPEED = " + new String(content));
-							JSONObject jsonObj = new JSONObject(new String(content));
-							clientObj.setRecvRobotPosAndSpeedObj(jsonObj); // 设置机器人底盘上报的速度和路段信息
-							int carOnePosPercent = jsonObj.getInt("carOnePosPercent");
-							if(carOnePosPercent == 100) { // 如果到达了某点
-								String carOneEndPosName = jsonObj.getString("carOneEndPosName");
-								System.out.println("@@到达中途地点 = " + carOneEndPosName);	
-								weiXinTemplateService.sendTemplateMessageToUniqueUser("到达中途点：" + carOneEndPosName);
-								clientObj.setCurrentPosName(carOneEndPosName); // 设置当前到达的中间点
-								// 向底盘发送停止命令，同时设置底盘的标志位到达某点为true，此段时间不响应人体检测的move命令								
-								DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
-								if(detectObj != null) {// 设置标志位不响应行走命令
-									detectObj.setReachedGoalNeedStop(true);
-								}									
-								ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), true); // 发送停止命令
-								
-								// 获取设置的到达此中途点需要停留的秒数，目前的实现是路径中不能有重复的点，如果有重复的点就需要再考虑
-								int staySec = 0; 
-								JSONArray pathPosArr = clientObj.getPosStayTimeJSONArr();
-								for(int i = 0; i < pathPosArr.length(); i++) {
-									JSONObject obj = pathPosArr.getJSONObject(i);
-									String name = obj.getString("posName");
-									if(name.equals(carOneEndPosName)) {
-										staySec = obj.getInt("staySec");
-										break;
-									}
-								}
-								int delayCount = 0;
-								boolean needSendSpeakMessage = false;
-								while(true) { // 休眠一段时间，如果没有扫码就继续行走，中间会重复说话
-									if(staySec > 0) { // 需要停留指定的时间
-										if(delayCount >= staySec) { // 如果超过设置的时间
-											// 设置标志位开始继续响应行走命令
-											if(detectObj != null) {
-												detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-											}											
-											ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-											System.out.println("@@底盘继续前往下一个目标点");
-											break;											
-										}
-										if (delayCount % 15 == 0) {
-											needSendSpeakMessage = true;
-										}										
-									} else { // 按默认时间停留
-										if(delayCount >= 30) {
-											// 设置标志位开始继续响应行走命令
-											if(detectObj != null) {
-												detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-											}											
-											ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-											System.out.println("@@底盘继续前往下一个目标点");
-											break;											
-										}
-										if (delayCount % 15 == 0) {
-											needSendSpeakMessage = true;
-										}										
-									}																										
-									if(needSendSpeakMessage) {
-										String speakMessage = ServerSocketThreadDetect.findPatrolDialogByState("reachedgoal", carOneEndPosName, clientObj.getMachineID());
-										if(speakMessage != null) {
-											DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID());
-											if(detectClient != null) { // 发送语音数据到人体检测模块
-												ServerSocketThreadDetect.sendDataToDetectSocket(detectClient.getMachineID(), speakMessage);
-											}
-										} else {
-											if(staySec <= 0) { // 如果此中途点不需要停留
-												System.out.println("@@到达中途点没有要说的话，退出，继续行走");
-												if(detectObj != null) {
-													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-												}											
-												ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-												break;
-											}else {
-												System.out.println("@@到达中途点没有要说的话，继续停留等待指定的时间");
-											}										
-										}
-										needSendSpeakMessage = false;
-									}
-									// 如果用户进行了扫码操作
-									ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(clientObj.getMachineID()); 
-									if(containerClient != null && containerClient.isCustomScanQrCode()) {
-										if(detectObj != null) {
-											detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-										}
-										System.out.println("@@到达中途地点停下时用户进行了扫码，退出此等待状态");
-										break;
-									}
-									delayCount++;
-									try {
-										Thread.sleep(1000); // 休眠一段时间
-									} catch (InterruptedException e) {
-										e.printStackTrace();
-									}
-								}															
-							}							
+							ServerSocketThreadRobot.robotMachineMap.put(registerCode, clientObj);							
+							ProcessRobotCmdThread procesCmdThread = new ProcessRobotCmdThread();
+							procesCmdThread.start();
+							clientObj.setProcesCmdThread(procesCmdThread);
 						}
+					} else if(cmd == QingpuConstants.RECV_ROBOT_POS_SPEED) { // 接收机器人发送的位置和速度消息以及到达中途点消息
+						currentRecvCmd = cmd;
+						needProcessCmdContent = new String(content);				
+						// System.out.println("@@收到底盘发送的位置以及速度消息");
 					}else if(cmd == QingpuConstants.RECV_ROBOT_REACHED_GOAL){ // 机器人到达目标点消息
-						JSONObject jsonObject = new JSONObject(new String(content));
-						RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(this.client);
-						if(clientObj != null) {
-							String currentPosName = jsonObject.getString("reachedPosName");
-							System.out.println("@@到达最终点 = " + currentPosName);
-							clientObj.setCurrentPosName(currentPosName);// 设置机器人当前的路径点名称
-							weiXinTemplateService.sendTemplateMessageToUniqueUser("到达当前行走路径终点：" + currentPosName);
-
-							// 判断机器人是否需要补货
-							String machineId = clientObj.getMachineID();
-							ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(machineId);
-							if(containerClient != null && containerClient.isRobotOutOfStore()) { // 机器人处于缺货状态
-								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点与设置的路径起始点一样，则通知管理员开始补货
-									clientObj.setHasRobotReachedGoal(false); // 缺货时设置机器人处于忙状态，不响应路径控制命令 
-									int delayCount = 0;
-									weiXinTemplateService.sendTemplateMessageToUniqueUser("零售商品不足，请及时补货");
-									ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "呼叫，呼叫，货柜商品不足，管理员同志快来给我补货吧"); // 进行语音播报
-									while(containerClient.isRobotOutOfStore()){
-										if(delayCount >= 2*30) {
-											ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "呼叫，呼叫，货柜商品不足，管理员同志快来给我补货吧"); // 进行语音播报
-											System.out.println("@@机器人处于缺货状态, 货柜商品不足，请管理员及时补货");
-											delayCount = 0;
-										}								
-										try {
-											Thread.sleep(500);
-											delayCount++;
-										} catch (InterruptedException e) {
-											e.printStackTrace();
-										}
-									}
-									ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "补货完成继续行走");
-									System.out.println("@@补货完成继续检测循环行走");
-								}											
-							} else {
-								System.out.println("@@到达终点货柜商品正常，不需要补货");
-							}
-							
-							// 判断是否需要循环行走，根据当前到达的终点判断继续下发路径点
-							JSONArray pathJSONArr = clientObj.getPosStayTimeJSONArr(); // 获取机器人绑定的路线jsonArr数据，在启动机器人进行循环行走时已经进行了设置
-							JSONArray sendPathJSONArr = new JSONArray();
-							System.out.println("@@机器人绑定的路线 = " + pathJSONArr);
-							if(pathJSONArr.length() > 0) { // 当机器人绑定的路线中有路径点
-								boolean needMove = false;
-								clientObj.setHasRobotReachedGoal(false); // 因为设置了循环路径，且没有设置停止运行，则标记机器人处于忙状态
-								if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点是路径的起始点，也就是充点电附近的地点
-									System.out.println("@@机器人到达充电点附近的一个终点");
-									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，向底盘发送进行充电命令
-										System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息，发送进行自动充电命令");
-										System.out.println("@@充电发送坐标信息 = " + pathJSONArr.getJSONObject(0));
-										ResponseSocketUtils.sendJsonDataToClient(
-												pathJSONArr.getJSONObject(0),
-												clientObj.getClient(),
-												QingpuConstants.SEND_START_CHARGE,
-												QingpuConstants.ENCRYPT_BY_NONE,
-												QingpuConstants.DATA_TYPE_JSON);										
-										clientObj.setHasRobotReachedGoal(true); // 设置机器人处于停靠空闲状态
-										
-										// 清空原来设置的路径信息，不然被定时器停止后，网页上单击运行到某点又会开始循环
-										clientObj.setStartLoopMiliTime(0);
-										clientObj.setStopLoopMiliTime(0);
-										clientObj.setStartPosName("");
-										clientObj.setPosStayTimeJSONArr(null);
-									} else {
-										System.out.println("@@机器人到达充电点起始点，继续运动，注意：不合理，请检测");																				
-									}
-								} else if(currentPosName.equals(pathJSONArr.getJSONObject(1).getString("posName"))) { // 如果是到达充电点的下一个点
-									System.out.println("@@到达充电点的下一个终点");
-									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，则导航到充电点附近的一个点
-										System.out.println("@@停止循环，发送到达充电点的路径信息");
-										sendPathJSONArr.put(0, pathJSONArr.get(1));
-										sendPathJSONArr.put(1, pathJSONArr.get(0));																				
-										needMove = true;										
-									} else {
-										System.out.println("@@继续循环");
-										for(int i = 1; i < pathJSONArr.length(); i++) { // 复制原来的路径信息，但是去除第一个点充电点
-											sendPathJSONArr.put(i-1, pathJSONArr.get(i));
-										}										
-										needMove = true;
-									}									
-								} else if(currentPosName.equals(pathJSONArr.getJSONObject(pathJSONArr.length()-1).getString("posName"))) { // 如果是到了路径点的最后一个点终点
-									System.out.println("@@到达路径最后一个点终点");
-									if(clientObj.isNeedStopLoopMove()) { // 如果需要停止循环
-										System.out.println("@@停止循环，翻转整条路径继续行走");
-										for(int i = pathJSONArr.length()-1, j = 0; i >= 0; i--, j++) { // 翻转原来的路径信息
-											sendPathJSONArr.put(j, pathJSONArr.get(i));
-										}
-										System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
-										needMove = true;										
-									} else {
-										System.out.println("@@往回走，继续循环");
-										for(int i = pathJSONArr.length()-1, j = 0; i >= 1; i--, j++) { // 翻转原来的路径信息，往回走的路径不包含充电点
-											sendPathJSONArr.put(j, pathJSONArr.get(i));
-										}
-										System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
-										needMove = true;
-									}									
-								}
-								
-								if(needMove) { // 如果需要继续运动，则运动之前先检测一下在这两个终点是否需要进行停留
-									DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
-									if(detectObj != null) {// 设置标志位不响应行走命令
-										detectObj.setReachedGoalNeedStop(true);
-									}									
-									ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), true); // 发送停止命令
-									
-									int staySec = clientObj.getLoopStartPosStaySec(); // 获取机器人在循环起始点需要暂停的时间									
-									int delayCount = 0;
-									boolean needSendSpeakMessage = false;
-									while(true) { // 休眠一段时间，如果没有扫码就继续行走，中间会重复说话
-										if(staySec > 0) { // 需要停留指定的时间
-											if(delayCount >= staySec) { // 如果超过设置的时间
-												// 设置标志位开始继续响应行走命令
-												if(detectObj != null) {
-													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-												}											
-												ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-												System.out.println("@@底盘继续在终点开始循环");
-												break;											
-											}
-											if (delayCount % 15 == 0) {
-												needSendSpeakMessage = true;
-											}										
-										} else { // 按默认时间停留
-											if(delayCount >= 30) {
-												// 设置标志位开始继续响应行走命令
-												if(detectObj != null) {
-													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-												}											
-												ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-												System.out.println("@@底盘继续在终点开始循环");
-												break;											
-											}
-											if (delayCount % 15 == 0) {
-												needSendSpeakMessage = true;
-											}										
-										}																										
-										if(needSendSpeakMessage) {
-											String speakMessage = ServerSocketThreadDetect.findPatrolDialogByState("reachedgoal", currentPosName, clientObj.getMachineID());
-											if(speakMessage != null) {
-												DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID());
-												if(detectClient != null) { // 发送语音数据到人体检测模块
-													ServerSocketThreadDetect.sendDataToDetectSocket(detectClient.getMachineID(), speakMessage);
-												}
-											} else {
-												if(staySec <= 0) { // 如果此终点不需要停留
-													System.out.println("@@到达终点没有要说的话，退出，继续行走");
-													if(detectObj != null) {
-														detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-													}											
-													ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
-													break;
-												}else {
-													System.out.println("@@到达终点没有要说的话，继续停留等待指定的时间");
-												}										
-											}
-											needSendSpeakMessage = false;
-										}
-										// 如果用户进行了扫码操作 
-										if(containerClient != null && containerClient.isCustomScanQrCode()) {
-											if(detectObj != null) {
-												detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
-											}
-											System.out.println("@@到达终点停下时用户进行了扫码，退出此等待状态");
-											break;
-										}
-										delayCount++;
-										try {
-											Thread.sleep(1000); // 休眠一段时间
-										} catch (InterruptedException e) {
-											e.printStackTrace();
-										}
-									}										
-									
-									JSONObject jsonObj = new JSONObject();
-									
-									jsonObj.put("carOneGoalPosName", sendPathJSONArr);
-									System.out.println("@@任务时间中继续运行循环路径 = " + jsonObj.toString());
-									ResponseSocketUtils.sendJsonDataToClient(
-											jsonObj, 
-											clientObj.getClient(),
-											QingpuConstants.SEND_ROBOT_GOAL,
-											QingpuConstants.ENCRYPT_BY_NONE,
-											QingpuConstants.DATA_TYPE_JSON);
-								}
-							} else {
-								System.out.println("@@机器人当前没有路径点可行走，请检查");
-							}
-						} else {
-							System.out.println("@@接收到达终点位置时底盘连接断开");
-						}
+						currentRecvCmd = cmd;
+						needProcessCmdContent = new String(content);
+						System.out.println("@@收到底盘发送的到达终点消息");
 					} else if(cmd == QingpuConstants.RECV_CURRENT_POS) { // 获取当前位置的坐标XYZ
 						System.out.println("@@收到坐标点  = " + new String(content));
 						JSONObject jsonObj = new JSONObject(new String(content));						
@@ -456,7 +194,15 @@ public class ClientSocketThreadRobot extends Thread {
 
 	// 关闭连接socket和销毁线程
 	public void closeClient() {
-		try {
+		try {			
+			System.out.println("@@底盘连接线程关闭主线程原来的连接和线程资源");
+			RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(getClient());
+			if(clientObj != null) {
+				if(clientObj.getProcesCmdThread() != null) {
+					clientObj.setNeedStopChindThread(true);
+					System.out.println("@@在closeClient()中底盘命令处理子线程还未退出，手动设置true使其退出");
+				}				
+			}
 			this.interrupt();
 			if (client != null) {
 				if(!client.isClosed()){
@@ -481,4 +227,329 @@ public class ClientSocketThreadRobot extends Thread {
 	public void setClient(Socket client) {
 		this.client = client;
 	}
+	
+	public class ProcessRobotCmdThread extends Thread {
+		@Override
+		public void run() {
+			System.out.println("@@启动底盘消息单独处理线程");
+			RobotClientSocket clientObj00 = ServerSocketThreadRobot.getRobotConnectObj(getClient());
+			while(clientObj00.isNeedStopChindThread() == false) {
+				try {
+					Thread.sleep(10);
+					if(needProcessCmdContent != null) { // 有命令内容需要进行处理
+						if(currentRecvCmd == QingpuConstants.RECV_ROBOT_POS_SPEED) { // 需要处理收到的速度和运动中间点消息
+							RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(getClient());
+							if(clientObj != null) {
+								// System.out.println("@@RECV_ROBOT_POS_SPEED = " + new String(content));
+								JSONObject jsonObj = new JSONObject(needProcessCmdContent);
+								clientObj.setRecvRobotPosAndSpeedObj(jsonObj); // 设置机器人底盘上报的速度和路段信息
+								int carOnePosPercent = jsonObj.getInt("carOnePosPercent");
+								if(carOnePosPercent == 100) { // 如果到达了某点
+									String carOneEndPosName = jsonObj.getString("carOneEndPosName");
+									System.out.println("@@到达中途点 = " + carOneEndPosName);	
+									weiXinTemplateService.sendTemplateMessageToUniqueUser("到达中途点：" + carOneEndPosName);
+									clientObj.setCurrentPosName(carOneEndPosName); // 设置当前到达的中间点
+									// 向底盘发送停止命令，同时设置底盘的标志位到达某点为true，此段时间不响应人体检测的move命令								
+									DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
+									if(detectObj != null) {// 设置标志位不响应行走命令
+										System.out.println("@@发送停止并设置标志位不响应行走命令setReachedGoalNeedStop(true)");
+										detectObj.setReachedGoalNeedStop(true);
+									}									
+									ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), true); // 发送停止命令
+									
+									// 获取设置的到达此中途点需要停留的秒数，目前的实现是路径中不能有重复的点，如果有重复的点就需要再考虑
+									int staySec = 0; 
+									JSONArray pathPosArr = clientObj.getPosStayTimeJSONArr();
+									for(int i = 0; i < pathPosArr.length(); i++) {
+										JSONObject obj = pathPosArr.getJSONObject(i);
+										String name = obj.getString("posName");
+										if(name.equals(carOneEndPosName)) {
+											staySec = obj.getInt("staySec");
+											break;
+										}
+									}
+									int delayCount = 0;
+									boolean needSendSpeakMessage = false;
+									System.out.println("@@该点需要停留的时间staySec = " + staySec);
+									while(true) { // 休眠一段时间，如果没有扫码就继续行走，中间会重复说话
+										if(staySec > 0) { // 需要停留指定的时间
+											if(delayCount >= staySec) { // 如果超过设置的时间
+												// 设置标志位开始继续响应行走命令
+												if(detectObj != null) {
+													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+												}											
+												ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+												System.out.println("@@底盘继续前往下一个目标点");
+												break;											
+											}
+											if (delayCount % 15 == 0) {
+												needSendSpeakMessage = true;
+											}										
+										} else { // 按默认时间停留
+											if(delayCount >= 30) {
+												// 设置标志位开始继续响应行走命令
+												if(detectObj != null) {
+													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+												}											
+												ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+												System.out.println("@@底盘停留了默认的时间，继续前往下一个目标点");
+												break;											
+											}
+											if (delayCount % 15 == 0) {
+												needSendSpeakMessage = true;
+											}										
+										}																										
+										if(needSendSpeakMessage) {
+											String speakMessage = ServerSocketThreadDetect.findPatrolDialogByState("reachedgoal", carOneEndPosName, clientObj.getMachineID());
+											System.out.println("@@中间点停留播放语音speakMessage = " + speakMessage);
+											if(speakMessage != null) {
+												DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID());
+												if(detectClient != null) { // 发送语音数据到人体检测模块
+													ServerSocketThreadDetect.sendDataToDetectSocket(detectClient.getMachineID(), speakMessage);
+												}
+											} else {
+												if(staySec <= 0) { // 如果此中途点不需要停留
+													System.out.println("@@到达中途点没有要说的话，退出，继续行走");
+													if(detectObj != null) {
+														detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+													}											
+													ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+													break;
+												}else {
+													System.out.println("@@到达中途点没有要说的话，继续停留等待指定的时间");
+												}										
+											}
+											needSendSpeakMessage = false;
+										}
+										// 如果用户进行了扫码操作
+										ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(clientObj.getMachineID()); 
+										if(containerClient != null && containerClient.isCustomScanQrCode()) {
+											if(detectObj != null) {
+												detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+											}
+											System.out.println("@@到达中途地点停下时用户进行了扫码，退出此等待状态");
+											break;
+										}
+										delayCount++;
+										try {
+											Thread.sleep(1000); // 休眠一段时间
+										} catch (InterruptedException e) {
+											e.printStackTrace();
+										}
+									}															
+								}							
+							}							
+						} else if(currentRecvCmd == QingpuConstants.RECV_ROBOT_REACHED_GOAL) { // 到达最终点
+							JSONObject jsonObject = new JSONObject(needProcessCmdContent);
+							RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(getClient());
+							if(clientObj != null) {
+								String currentPosName = jsonObject.getString("reachedPosName");
+								System.out.println("@@到达最终点 = " + currentPosName);
+								clientObj.setCurrentPosName(currentPosName);// 设置机器人当前的路径点名称
+								weiXinTemplateService.sendTemplateMessageToUniqueUser("到达终点：" + currentPosName);
+
+								// 判断机器人是否需要补货
+								String machineId = clientObj.getMachineID();
+								ContainerClientSocket containerClient = ServerSocketThread.containerMachineMap.get(machineId);
+								if(containerClient != null && containerClient.isRobotOutOfStore()) { // 机器人处于缺货状态，应该直接查询数据库，避免中间断开信息丢失的问题
+									if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点与设置的路径起始点一样，则通知管理员开始补货
+										clientObj.setHasRobotReachedGoal(false); // 缺货时设置机器人处于忙状态，不响应路径控制命令 
+										int delayCount = 0;
+										weiXinTemplateService.sendTemplateMessageToUniqueUser("提醒：零售商品不足，请及时补货");
+										// ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "呼叫，呼叫，货柜商品不足，管理员同志快来给我补货吧"); // 进行语音播报
+										while(containerClient.isRobotOutOfStore()){
+											if(delayCount >= 30) { // 30秒发送微信管理员一次消息
+												// ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "呼叫，呼叫，货柜商品不足，管理员同志快来给我补货吧"); // 进行语音播报
+												weiXinTemplateService.sendTemplateMessageToUniqueUser("零售商品不足，请及时补货");
+												System.out.println("@@机器人处于缺货状态, 货柜商品不足，请管理员及时补货");
+												delayCount = 0;
+											}								
+											try {
+												Thread.sleep(2000);
+												delayCount++;
+											} catch (InterruptedException e) {
+												e.printStackTrace();
+											}
+										}
+										ServerSocketThreadDetect.sendDataToDetectSocket(machineId, "补货完成继续行走");
+										System.out.println("@@补货完成继续检测循环行走");
+									}											
+								} else {
+									if(currentPosName.equals(clientObj.getStartPosName())) {
+										weiXinTemplateService.sendTemplateMessageToUniqueUser("商品正常不需要补货");
+									}									
+									System.out.println("@@到达终点货柜商品正常，不需要补货");
+								}
+								
+								// 判断是否需要循环行走，根据当前到达的终点判断继续下发路径点
+								JSONArray pathJSONArr = clientObj.getPosStayTimeJSONArr(); // 获取机器人绑定的路线jsonArr数据，在启动机器人进行循环行走时已经进行了设置
+								JSONArray sendPathJSONArr = new JSONArray();
+								System.out.println("@@机器人绑定的路线 = " + pathJSONArr);
+								if(pathJSONArr.length() > 0) { // 当机器人绑定的路线中有路径点
+									boolean needMove = false;
+									clientObj.setHasRobotReachedGoal(false); // 因为设置了循环路径，且没有设置停止运行，则标记机器人处于忙状态
+									if(currentPosName.equals(clientObj.getStartPosName())) { // 如果当前的终点是路径的起始点，也就是充点电附近的地点
+										System.out.println("@@机器人到达充电点附近的一个终点");
+										if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，向底盘发送进行充电命令
+											System.out.println("@@机器人结束循环状态，处于停靠状态，清空原来的路径相关信息，发送进行自动充电命令");
+											System.out.println("@@充电发送坐标信息 = " + pathJSONArr.getJSONObject(0));
+											ResponseSocketUtils.sendJsonDataToClient(
+													pathJSONArr.getJSONObject(0),
+													clientObj.getClient(),
+													QingpuConstants.SEND_START_CHARGE,
+													QingpuConstants.ENCRYPT_BY_NONE,
+													QingpuConstants.DATA_TYPE_JSON);										
+											clientObj.setHasRobotReachedGoal(true); // 设置机器人处于停靠空闲状态
+											
+											// 清空原来设置的路径信息，不然被定时器停止后，网页上单击运行到某点又会开始循环
+											clientObj.setStartLoopMiliTime(0);
+											clientObj.setStopLoopMiliTime(0);
+											clientObj.setStartPosName("");
+											clientObj.setPosStayTimeJSONArr(null);
+										} else {
+											System.out.println("@@机器人到达充电点起始点，继续运动，注意：不合理，请检测");																				
+										}
+									} else if(currentPosName.equals(pathJSONArr.getJSONObject(1).getString("posName"))) { // 如果是到达充电点的下一个点
+										System.out.println("@@到达充电点的下一个终点");
+										if(clientObj.isNeedStopLoopMove()) { // 如果需要停止，则导航到充电点附近的一个点
+											System.out.println("@@停止循环，发送到达充电点的路径信息");
+											sendPathJSONArr.put(0, pathJSONArr.get(1));
+											sendPathJSONArr.put(1, pathJSONArr.get(0));																				
+											needMove = true;										
+										} else {
+											System.out.println("@@继续循环");
+											for(int i = 1; i < pathJSONArr.length(); i++) { // 复制原来的路径信息，但是去除第一个点充电点
+												sendPathJSONArr.put(i-1, pathJSONArr.get(i));
+											}										
+											needMove = true;
+										}									
+									} else if(currentPosName.equals(pathJSONArr.getJSONObject(pathJSONArr.length()-1).getString("posName"))) { // 如果是到了路径点的最后一个点终点
+										System.out.println("@@到达路径最后一个点终点");
+										if(clientObj.isNeedStopLoopMove()) { // 如果需要停止循环
+											System.out.println("@@停止循环，翻转整条路径继续行走");
+											for(int i = pathJSONArr.length()-1, j = 0; i >= 0; i--, j++) { // 翻转原来的路径信息
+												sendPathJSONArr.put(j, pathJSONArr.get(i));
+											}
+											System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
+											needMove = true;										
+										} else {
+											System.out.println("@@往回走，继续循环");
+											for(int i = pathJSONArr.length()-1, j = 0; i >= 1; i--, j++) { // 翻转原来的路径信息，往回走的路径不包含充电点
+												sendPathJSONArr.put(j, pathJSONArr.get(i));
+											}
+											System.out.println("@@翻转之后的路径 = " + sendPathJSONArr);
+											needMove = true;
+										}									
+									}
+									
+									if(needMove) { // 如果需要继续运动，则运动之前先检测一下在这两个终点是否需要进行停留
+										DetectClientSocket detectObj = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID()); 
+										if(detectObj != null) {// 设置标志位不响应行走命令
+											detectObj.setReachedGoalNeedStop(true);
+										}									
+										ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), true); // 发送停止命令
+										
+										int staySec = clientObj.getLoopStartPosStaySec(); // 获取机器人在循环起始点需要暂停的时间
+										System.out.println("@@机器人在终点需要停留的时间staySec = " + staySec);
+										int delayCount = 0;
+										boolean needSendSpeakMessage = false;
+										while(true) { // 休眠一段时间，如果没有扫码就继续行走，中间会重复说话
+											if(staySec > 0) { // 需要停留指定的时间
+												if(delayCount >= staySec) { // 如果超过设置的时间
+													// 设置标志位开始继续响应行走命令
+													if(detectObj != null) {
+														detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+													}											
+													ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+													System.out.println("@@底盘继续在终点开始循环");
+													break;											
+												}
+												if (delayCount % 15 == 0) {
+													needSendSpeakMessage = true;
+												}										
+											} else { // 按默认时间停留
+												if(delayCount >= 30) {
+													// 设置标志位开始继续响应行走命令
+													if(detectObj != null) {
+														detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+													}											
+													ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+													System.out.println("@@底盘继续在终点开始循环");
+													break;											
+												}
+												if (delayCount % 15 == 0) {
+													needSendSpeakMessage = true;
+												}										
+											}																										
+											if(needSendSpeakMessage) {
+												String speakMessage = ServerSocketThreadDetect.findPatrolDialogByState("reachedgoal", currentPosName, clientObj.getMachineID());
+												System.out.println("@@到达终点 = " + currentPosName + ", 播报语句 = " + speakMessage);
+												if(speakMessage != null) {
+													DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(clientObj.getMachineID());
+													if(detectClient != null) { // 发送语音数据到人体检测模块
+														ServerSocketThreadDetect.sendDataToDetectSocket(detectClient.getMachineID(), speakMessage);
+													}
+												} else {
+													if(staySec <= 0) { // 如果此终点不需要停留
+														System.out.println("@@到达终点没有要说的话，退出，继续行走");
+														if(detectObj != null) {
+															detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+														}											
+														ServerSocketThreadRobot.sendMoveCmdToRoobt(clientObj.getMachineID(), false); // 发送继续行走命令
+														break;
+													}else {
+														System.out.println("@@到达终点没有要说的话，继续停留等待指定的时间");
+													}										
+												}
+												needSendSpeakMessage = false;
+											}
+											// 如果用户进行了扫码操作 
+											if(containerClient != null && containerClient.isCustomScanQrCode()) {
+												if(detectObj != null) {
+													detectObj.setReachedGoalNeedStop(false); // 离开此点，继续响应人体检测运动命令
+												}
+												System.out.println("@@到达终点停下时用户进行了扫码，退出此等待状态");
+												break;
+											}
+											delayCount++;
+											try {
+												Thread.sleep(1000); // 休眠一段时间
+											} catch (InterruptedException e) {
+												e.printStackTrace();
+											}
+										}										
+										
+										JSONObject jsonObj = new JSONObject();
+										
+										jsonObj.put("carOneGoalPosName", sendPathJSONArr);
+										System.out.println("@@任务时间中继续运行循环路径 = " + jsonObj.toString());
+										ResponseSocketUtils.sendJsonDataToClient(
+												jsonObj, 
+												clientObj.getClient(),
+												QingpuConstants.SEND_ROBOT_GOAL,
+												QingpuConstants.ENCRYPT_BY_NONE,
+												QingpuConstants.DATA_TYPE_JSON);
+									}
+								} else {
+									System.out.println("@@机器人当前没有路径点可行走，请检查");
+								}
+							} else {
+								System.out.println("@@接收到达终点位置时底盘连接断开");
+							}
+							
+						}						
+						needProcessCmdContent = null; // 清空内容						
+					}				
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}				
+			}
+			RobotClientSocket clientObj = ServerSocketThreadRobot.getRobotConnectObj(getClient());
+			if(clientObj != null) {
+				clientObj.setProcesCmdThread(null);
+				clientObj.setNeedStopChindThread(false);
+			}
+			System.out.println("@@退出底盘消息处理子线程while(true)");
+		}
+	}	
 }

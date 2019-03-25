@@ -80,6 +80,8 @@ public class ServerSocketThreadDetect extends Thread {
 		if(speakMessage == null) {
 			System.out.println("@@对话内容不存在");
 			return;
+		} else {
+			System.out.println("@@播报对话内容 = " + speakMessage);
 		}
 		try {
 			DetectClientSocket detectClient = ServerSocketThreadDetect.detectMachineMap.get(machineId);
@@ -466,10 +468,10 @@ public class ServerSocketThreadDetect extends Thread {
 						DetectClientSocket beat = entry.getValue();
 						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*5){ //秒
 							if(!beat.isTimeout()) { // 如果还没有设置超时
+								System.out.println("@@人体识别控制线程心跳超时，移除客户端 machineID = " + key);
 								beat.setTimeout(true);
 								beat.getClientThread().closeClient();//关闭连接socket和释放线程
-								//it.remove();//从在线列表中移除
-								System.out.println("@@人体识别控制线程心跳超时，移除客户端 machineID = " + key);
+								//it.remove();//从在线列表中移除								
 							}							
 						}
 					}

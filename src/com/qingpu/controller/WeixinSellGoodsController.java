@@ -147,7 +147,13 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 								obj.put("goodsUrl", goods.getFileurl());
 								obj.put("price", goods.getPrice());
 								obj.put("goodsFloor", floor.getFloorName()); // 商品所在货架的层名 goodsFloor1 | 2 | 3 | 4
-								obj.put("currentCount", floor.getCurrentCount());
+								if("goodsFloor1".equals(floor.getFloorName())) { // 最上面一层，第一层，现在只让最里面一排的货柜进行出货
+									obj.put("currentCount", floor.getCurrentCount()-12);
+								} else if("goodsFloor2".equals(floor.getFloorName())) {
+									obj.put("currentCount", floor.getCurrentCount()-8);
+								} else if("goodsFloor3".equals(floor.getFloorName())) {
+									obj.put("currentCount", floor.getCurrentCount()-6);
+								}								
 								arrTemp.put(obj);
 								arr.put(arrTemp);
 							}							
@@ -228,7 +234,7 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 			} else if(robotObj != null && robotObj.isHasRobotReachedGoal() && clientSocket.isRobotOutOfStore()) { // 是否处于停靠状态缺货状态
 				System.out.println("@@编号" + machineID + "机器人处于停靠的缺货状态，请及时补货");
 				retObj.setCode(-1);
-				retObj.setMessage("Wait");
+				retObj.setMessage("SellOut");
 			} else {
 				// 检查用户所购买的商品是否还有货
 				Robot robot = robotDao.getRobotByMachineId(machineID);
@@ -516,13 +522,14 @@ public class WeixinSellGoodsController extends HandlerInterceptorAdapter {
 						clientSocket.setDeviceBusy(true); // 设置当前设备为忙，激活控制货柜线程，不响应其他付款请求
 						clientSocket.setCurrentOrderId(orderId); //设置当前的订单对象id
 						ServerSocketThread.containerMachineMap.put(machineId, clientSocket); // 更新当前的货柜连接对象
+						System.out.println("@@付款成功，通知售货监听线程开始出货");
 					}
 					
 					// 通知货柜用户已经进行了支付
 					Robot robot = robotDao.getRobotByMachineId(machineId);
 					String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "userpay", "OK"); // 查询用户成功进行了支付的对话
-					speakMessage = "!"+speakMessage;
 					ServerSocketThreadDetect.sendDataToDetectSocket(machineId, speakMessage);
+					// System.out.println("@@播报付款成功对话 = " + speakMessage);
 				}else{
 					System.out.println("@@SellRobotSys已经收到回调通知了");
 					return;

@@ -74,7 +74,7 @@ public class TimerServiceImpl implements TimerService {
 	/**
 	 * 零售机器人售卖任务中用于定时执行路径规划功能
 	 * */
-	@Scheduled(cron = "*/10 * * * * ?") // 十秒钟触发一次
+	// @Scheduled(cron = "*/10 * * * * ?") // 十秒钟触发一次
 	public synchronized void processPathPlanTask() {
 		// 遍历底盘连接map对象
 		Iterator<Entry<String, RobotClientSocket>> it = ServerSocketThreadRobot.robotMachineMap.entrySet().iterator();

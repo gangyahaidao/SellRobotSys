@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.qingpu.common.service.WeiXinTemplateService;
 import com.qingpu.common.utils.CommonUtils;
 import com.qingpu.common.utils.DataProcessUtils;
 import com.qingpu.common.utils.QingpuConstants;
@@ -34,12 +35,14 @@ public class ClientSocketThread extends Thread {
 	private GoodsService goodsService;
 	private RobotsDao robotDao;
 	private boolean hasRecvCMD = false;
-	private boolean hasOutOne = false;
+	private boolean hasOutOne = false;	
+	private WeiXinTemplateService weiXinTemplateService;
 
-	public ClientSocketThread(Socket client, GoodsService goodsService, RobotsDao robotDao) {
+	public ClientSocketThread(Socket client, GoodsService goodsService, RobotsDao robotDao, WeiXinTemplateService weiXinTemplateService) {
 		this.client = client;
 		this.goodsService = goodsService;
 		this.robotDao = robotDao;
+		this.weiXinTemplateService = weiXinTemplateService;
 	}
 
 	@Override
@@ -87,11 +90,26 @@ public class ClientSocketThread extends Thread {
 									ServerSocketThread.containerMachineMap.put(clientSocket.getMachineID(), clientSocket);//直接进行覆盖添加
 								}	
 							}									
-						} else if(CommonUtils.isNumber(content)){ // 心跳数据只是一个数字字符串
+						} else if(CommonUtils.isNumber(content)){ // 货柜子连接进行注册
 							synchronized (ServerSocketThread.containerMachineMap){
 								ContainerClientSocket containerSocket = ServerSocketThread.containerMachineMap.get(content); 
 								if(containerSocket != null) {
-									System.out.println("@@收到货柜串口断开后的注册消息");
+									System.out.println("@@收到货柜串口断开后重新注册的消息");
+									System.out.println("@@上一个 processSellThread = " + containerSocket.getProcessSellThread());
+									if(containerSocket.getProcessSellThread() != null) {
+										System.out.println("@@货柜监控子线程还未退出，等待监控子线程关闭");
+										containerSocket.setNeedStopChildThread(true); // 主动关闭售货监控子线程
+										while(containerSocket.getProcessSellThread() != null){
+											try {
+												Thread.sleep(500);
+												System.out.println("@@processSellThread = " + containerSocket.getProcessSellThread());
+											} catch (InterruptedException e) {
+												e.printStackTrace();
+											}
+										}
+										System.out.println("@@关闭了货柜监控子线程");
+									}
+									containerSocket.getClientThread().closeClient(); // 先关闭原来的socket和线程，同时释放货柜监听线程，避免重新连接之后线程未被心跳监听程序断开，导致同时有多个货柜监听线程启动出货操作
 									containerSocket.setClient(getClient());
 									containerSocket.setClientThread(this);
 									containerSocket.setPreDate(new Date());								
@@ -104,9 +122,11 @@ public class ClientSocketThread extends Thread {
 									containerSocket.setPreDate(new Date());
 								}
 								containerSocket.setTimeout(false); // 设置为没有超时状态
-								ServerSocketThread.containerMachineMap.put(content, containerSocket);
-							}							
-							new ProcessSellGoodsClientThread().start(); // 货柜注册之后再启动监听出货线程
+								ServerSocketThread.containerMachineMap.put(content, containerSocket);														
+								ProcessSellGoodsClientThread processSellThread = new ProcessSellGoodsClientThread();
+								processSellThread.start(); // 货柜注册之后再启动监听出货线程
+								containerSocket.setProcessSellThread(processSellThread);
+							}														
 						} else {
 							System.out.println("@@收到货柜其他消息 = " + content);
 						}
@@ -116,8 +136,9 @@ public class ClientSocketThread extends Thread {
 						result = DataProcessUtils.appendByte(result, b);
 					}					
 				}
-			}		
-		} catch (IOException e) {
+			}
+			System.out.println("@@退出了货柜监控主线程while(1)");
+		} catch (IOException e) {			
 			System.out.println("@@货柜连接socket连接断开  = " + e.getMessage());
 		}
 	}
@@ -125,24 +146,21 @@ public class ClientSocketThread extends Thread {
 	//创建一个线程检测当前是否要进行出货操作
 	public class ProcessSellGoodsClientThread extends Thread{
 		@Override
-		public void run(){	
+		public void run(){
 			System.out.println("@@启动监听货柜出货线程");
 			
 			ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(getClient());			
 			int scanDelayCount = 0;
-			while(true){
+			while(clientSocket.isNeedStopChildThread() == false){
 				try {
-					Thread.sleep(50);
+					Thread.sleep(20);
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
-				}
-				if(clientSocket.isTimeout()) { // 如果货柜连接socket断开，则此监听线程也退出
-					break;
 				}
 				
 				if(clientSocket.isCustomScanQrCode()) { // 如果用户进行了扫码则停止并开始计时
 					scanDelayCount++;
-					if(scanDelayCount > 20*QingpuConstants.SCANQR_OVERFLOW_TIME) { // 扫码未付款大于XXs则继续行走
+					if(scanDelayCount >= 50*QingpuConstants.SCANQR_OVERFLOW_TIME) { // 扫码未付款大于XXs则继续行走
 						clientSocket.setCustomScanQrCode(false);
 						scanDelayCount = 0;						
 						// 发送继续行走命令
@@ -153,10 +171,6 @@ public class ClientSocketThread extends Thread {
 					scanDelayCount = 0; // 重置为0，避免下一次用户扫码计时的时候不准确
 				}			
 				
-				if(clientSocket.getClient() == null) {
-					System.out.println("@@货柜socket断开，出货监听线程也退出");
-					break;
-				}
 				if(clientSocket.getClient()!=null && clientSocket.isDeviceBusy()){ // 如果设备连接上且处于忙状态，说明需要进行出货操作
 					hasOutOne = false;
 					hasRecvCMD = false;
@@ -167,7 +181,6 @@ public class ClientSocketThread extends Thread {
 					Robot robot = robotDao.getRobotByMachineId(machineId); // 查找数据库中出货的机器人对象
 					if(robot != null && order != null){ //遍历出货
 						System.out.println("@@开始进行出货");
-
 						List<OrderItem> orderItems = order.getOrderItemList();
 						orderItems.removeAll(Collections.singleton(null)); // 去除List中为空的元素
 						System.out.println("@@将要出货种类数量 = " + orderItems.size());
@@ -190,7 +203,8 @@ public class ClientSocketThread extends Thread {
 									currentGoodsFloorIndex = i;
 									break;
 								}
-							}							
+							}					
+							weiXinTemplateService.sendTemplateMessageToUniqueUser("付款商品名称=" + goods.getName() + ",数量=" + buyCount); // 发送购买商品的数量和名称到管理员微信
 							
 							for(int i = 0; i < buyCount; i++){ // 对同一种商品进行出货，用户购买的数量
 								String goodsFloor = item.getGoodsFloor().substring(10); // goodsFloor 1 | 2 | 3																
@@ -227,7 +241,7 @@ public class ClientSocketThread extends Thread {
 								dataT = DataProcessUtils.mergeArray(dataT, DataProcessUtils.toByteArray(flag_tail, 1));
 								
 								JSONObject adObj = new JSONObject(); // 发送消息给广告连接线程，通知开始播放商品出货动画
-								adObj.put("floorName", goodsFloor+".mp4"); // 发送当前商品所在的层数 1 、2、3
+								adObj.put("floorName", goodsFloor+".mp4"); // 向广告屏幕发送播放动画消息，发送当前商品所在的层数 1 、2、3
 								System.out.println("@@发送命令-开始播放商品出货动画");
 								ServerSocketThreadAD.sendDataToAdSocket(clientSocket.getMachineID(), adObj);								
 								sendDataRet = ServerSocketThread.sendDataToContainerSocket(clientSocket.getClient(), dataT); // 发送数据给货柜
@@ -237,6 +251,8 @@ public class ClientSocketThread extends Thread {
 									item.setWhichCountGoodsHasError(i+1); // 设置出货异常的产品个数
 									hasGoodsOutError = true;
 									continue; // 继续进行下一个出货
+								} else {
+									System.out.println("@@发送出货命令成功");
 								}
 								
 								int sendDelayCount = 0;
@@ -248,16 +264,11 @@ public class ClientSocketThread extends Thread {
 									}
 									sendDelayCount++;
 									if(sendDelayCount > 5*8) {
-										sendDataRet = ServerSocketThread.sendDataToContainerSocket(clientSocket.getClient(), dataT);
 										sendDelayCount = 0;
-										if(sendDataRet == -1) {
-											System.out.println("@@发送数据失败，出货中货柜断开连接，出货线程退出，标记该商品出货为异常");
-											item.setStatus("error");											
-											item.setWhichCountGoodsHasError(i+1); // 设置出货异常的是第几个产品
-											hasGoodsOutError = true;
-											break;
-										}
-										System.out.println("@@超过指定时间未收到货柜应答RECV信号");
+										item.setStatus("error");											
+										item.setWhichCountGoodsHasError(i+1); // 设置出货异常的是第几个产品
+										hasGoodsOutError = true;
+										System.out.println("@@超过指定时间未收到货柜应答RECV信号，设置出货异常后继续出货");
 										sendDataRet = -1;
 										break; // 退出一直等待状态，继续向下
 									}
@@ -289,7 +300,7 @@ public class ClientSocketThread extends Thread {
 										hasGoodsOutError = true;
 										break;
 									}
-								}
+								}								
 								if(hasOutOne == false) { // 没有收到货物掉下的消息
 									String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "goodsout", "ERROR"); // 发送出货异常语音
 									speakMessage = "!"+speakMessage;
@@ -298,8 +309,7 @@ public class ClientSocketThread extends Thread {
 									continue; // 继续下一个出货
 								} else {
 									hasOutOne = false;
-									item.setStatus("success"); // 设置订单的一个子产品出货状态正常
-									System.out.println("@@SellRobotSys成功完成一个出货");
+									item.setStatus("success"); // 设置订单的一个子产品出货状态正常									
 									
 									// 通知人体检测模块货柜已经完成了一个出货
 									String speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "goodsout", "OK");
@@ -313,6 +323,7 @@ public class ClientSocketThread extends Thread {
 									goods.setGoodsSales(goods.getGoodsSales()+1); // 该商品的销售数量
 									goods.setRepertory(goods.getRepertory()-1); // 商品总库存
 									goodsService.updateGoodsInfo(goods);
+									System.out.println("@@SellRobotSys成功完成一个出货，更新了数据库信息");
 								}								
 							}		
 						}
@@ -324,6 +335,7 @@ public class ClientSocketThread extends Thread {
 						} else {
 							order.setOutStatus("outOK"); // 设置当前订单正常完成
 							goodsService.updateOrder(order);
+							System.out.println("@@更新订单正常完成");
 						}												
 										
 						if(!hasGoodsOutError) { // 如果订单出货没有失败，检测商品拿走的事件
@@ -335,15 +347,12 @@ public class ClientSocketThread extends Thread {
 								try {
 									Thread.sleep(200);
 									waitCount++;
-									if(waitCount == 5*10) {
-										System.out.println("@@等待15秒未拿走商品，第一次播报警告信息");										
-										ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);
-										try {
-											Thread.sleep(4000); // 休眠一段时间，让提醒拿货语句播放完毕
-										} catch (InterruptedException e) {
-											e.printStackTrace();
-										}
-										break; // 只播报一次就退出等待
+									if(waitCount == 5*5) {																			
+										ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage); // 此处播报的语音不进行优先播报										
+										System.out.println("@@等待15秒未拿走商品，播报警告信息并退出等待");										
+									} else if(waitCount == 5*8) {
+										System.out.println("@@退出提醒拿走商品播报");
+										break;
 									}
 								} catch (InterruptedException e) {
 									e.printStackTrace();
@@ -351,23 +360,37 @@ public class ClientSocketThread extends Thread {
 							}
 							speakMessage = ServerSocketThreadDetect.findOtherDialogByTypeState(robot.getTalkId(), "opendoor", "OK"); // 成功拿走商品的对话，或者是等待拿走货物超时
 							speakMessage = "!"+speakMessage;
-							ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);// 最后播报期待再次光临语句
-							try {
-								Thread.sleep(4000); // 休眠一段时间，让最后欢迎语句播放完毕
-							} catch (InterruptedException e) {
-								e.printStackTrace();
-							}							
+							ServerSocketThreadDetect.sendDataToDetectSocket(clientSocket.getMachineID(), speakMessage);// 最后播报期待再次光临语句							
+							System.out.println("@@播报最后假定拿走商品的语句");
 						}
 						
 						// 检查设备是否处于缺货状态
+						boolean hasOutOfStore = false;
 						for(OneContainerFloor floor : robotFloorList) {
-							if(floor.getCurrentCount() <= 0) {
-								robot.setRobotOutOfStore(true); // 设置当前数据库机器人对象处于缺货状态
-								robotDao.updateRobotInfo(robot); // 更新到数据库
-								ServerSocketThread.containerMachineMap.get(machineId).setRobotOutOfStore(true);
-								System.out.println("@@出货之后检查，发现机器人处于缺货状态，将在返回循环起始点时停止循环并提醒管理员补货");
-								break;
+							if(floor != null) {
+								System.out.println("@@出货之后检查货柜当前层 = " + floor.getFloorName() + ", 剩余数量 = " + floor.getCurrentCount());
+//								if("goodsFloor1".equals(floor.getFloorName())) { // 最上面一层，第一层，现在只让最里面一排的货柜进行出货
+//									if(floor.getCurrentCount() <= 12) {
+//										hasOutOfStore = true;
+//									}
+//								} 
+								if("goodsFloor2".equals(floor.getFloorName())) { // 目前只售卖钥匙扣
+									if(floor.getCurrentCount() <= 8) {
+										hasOutOfStore = true;
+									}
+								} 
+//								else if("goodsFloor3".equals(floor.getFloorName())) {
+//									if(floor.getCurrentCount() <= 6) {
+//										hasOutOfStore = true;
+//									}
+//								}
 							}
+						}
+						if(hasOutOfStore) {
+							ServerSocketThread.containerMachineMap.get(machineId).setRobotOutOfStore(true);
+							robot.setRobotOutOfStore(true); // 设置当前数据库机器人对象处于缺货状态
+							robotDao.updateRobotInfo(robot); // 更新到数据库								
+							System.out.println("@@出货之后检查，发现机器人处于缺货状态，将在返回循环起始点时停止循环并提醒管理员补货");
 						}
 						
 						clientSocket.setInBuyGoodsProcess(false); // 将货柜脱离购买模式
@@ -375,19 +398,33 @@ public class ClientSocketThread extends Thread {
 						clientSocket.setDeviceBusy(false); // 设置设备处于闲状态
 						
 						// 发送一个继续运动命令, 防止买完东西之后没有收到继续运动命令停在原地
-						ServerSocketThreadRobot.sendMoveCmdToRoobt(clientSocket.getMachineID(), false);					
+						ServerSocketThreadRobot.sendMoveCmdToRoobt(clientSocket.getMachineID(), false);		
+						System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@出货完成，发送继续行走@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 					} else {
 						System.out.println("@@出货时未查找到订单或者数据库机器人对象");
 					}
 				}				
 			}
-			System.out.println("@@关闭货柜出货监听线程");
+			if(clientSocket != null) {
+				clientSocket.setCustomScanQrCode(false); // 复位用户扫码标识位，避免用户扫码断开之后不继续行走的问题
+				clientSocket.setNeedStopChildThread(false);
+				clientSocket.setProcessSellThread(null);
+			}			
+			System.out.println("@@@@退出while()循环，关闭货柜出货监听线程");
 		}
 	}
 
 	// 关闭连接socket和销毁线程
 	public void closeClient() {		
-		try {
+		try {			
+			System.out.println("@@closeClient()货柜线程关闭主线程原来的连接和线程资源");	
+			ContainerClientSocket clientSocket = ServerSocketThread.getContainerConnectObj(this.client);
+			if(clientSocket != null){
+				if(clientSocket.getProcessSellThread() != null) {
+					clientSocket.setNeedStopChildThread(true);
+					System.out.println("@@在closeClient()中，货柜监听子线程还未退出，设置setNeedStopChildThread(true)");
+				}				
+			}
 			this.interrupt(); // 关闭当前线程
 			if (client != null) {
 				if(!client.isClosed()){

@@ -178,10 +178,10 @@ public class ServerSocketThreadRobot extends Thread{
 						//如果当前时间 - 上一次收到心跳的时间 >= 3000ms
 						if((new Date().getTime() - preTime.getTime()) >= 1000*5){ //ms		
 							if(!beat.isTimeout()) {
+								System.out.println("@@底盘心跳超时，移除客户端 machineID = " + key);
 								beat.setTimeout(true);
 								beat.getClientThread().closeClient();//关闭连接socket和释放线程							
-								// it.remove();//从在线列表中移除
-								System.out.println("@@底盘心跳超时，移除客户端 machineID = " + key);
+								// it.remove();//从在线列表中移除								
 							}																									
 						}
 					}

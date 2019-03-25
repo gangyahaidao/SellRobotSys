@@ -9,6 +9,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.qingpu.socketservice.ClientSocketThreadRobot;
+import com.qingpu.socketservice.ClientSocketThreadRobot.ProcessRobotCmdThread;
 
 /**
  * 机器人底盘连接的socket对象
@@ -20,6 +21,8 @@ public class RobotClientSocket {
 	private String machineID; // 机器人编号
 	private Date preDate; // 接收上一次心跳的时间
 	private boolean isTimeout;
+	private ProcessRobotCmdThread procesCmdThread = null;
+	private boolean needStopChindThread = false;
 
 	private JSONObject recvRobotPosAndSpeedObj; // 存储底盘上传的位置速度信息
 	private boolean hasRobotReachedGoal; // 初始处于空闲状态
@@ -36,6 +39,14 @@ public class RobotClientSocket {
 
 	private int loopStartPosStaySec; // 循环一圈之后在起始点停留的时间	
 	
+	public boolean isNeedStopChindThread() {
+		return needStopChindThread;
+	}
+
+	public void setNeedStopChindThread(boolean needStopChindThread) {
+		this.needStopChindThread = needStopChindThread;
+	}
+
 	public JSONObject getCurrentPosObj() {
 		return currentPosObj;
 	}
@@ -43,6 +54,15 @@ public class RobotClientSocket {
 	public void setCurrentPosObj(JSONObject currentPosObj) {
 		this.currentPosObj = currentPosObj;
 	}
+	
+	public ProcessRobotCmdThread getProcesCmdThread() {
+		return procesCmdThread;
+	}
+
+	public void setProcesCmdThread(ProcessRobotCmdThread procesCmdThread) {
+		this.procesCmdThread = procesCmdThread;
+	}
+
 	public boolean isTimeout() {
 		return isTimeout;
 	}

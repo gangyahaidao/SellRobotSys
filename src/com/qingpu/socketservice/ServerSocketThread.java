@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.qingpu.common.service.WeiXinTemplateService;
 import com.qingpu.goods.service.GoodsService;
 import com.qingpu.robots.dao.RobotsDao;
 
@@ -24,16 +25,18 @@ public class ServerSocketThread extends Thread{
 	private static final int SERVERPORT = 19999;
 	private GoodsService goodsService;
 	private RobotsDao robotDao;
+	private WeiXinTemplateService weiXinTemplateService;
 	
 	public static Map<String, ContainerClientSocket> containerMachineMap = new HashMap<String, ContainerClientSocket>(); // 用于存储售货机器人的socket连接，key值为机器上传的心跳中包含的编号值
 		
-	public ServerSocketThread(GoodsService goodsService, RobotsDao robotDao){
+	public ServerSocketThread(GoodsService goodsService, RobotsDao robotDao, WeiXinTemplateService weiXinTemplateService){
 		try {
 			if (null == serverSocket) {
 				this.serverSocket = new ServerSocket(SERVERPORT);  // "120.24.175.156", 9877
 			}
 			this.goodsService = goodsService;
 			this.robotDao = robotDao;
+			this.weiXinTemplateService = weiXinTemplateService;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -89,7 +92,7 @@ public class ServerSocketThread extends Thread{
 				client.setTcpNoDelay(true);//立即发送数据
 				client.setKeepAlive(true);//当长时间未能发送数据，服务器主动断开连接
 				//创建新的客户端线程处理请求，如果请求鉴权通过就加入到在线客户端列表中，如果不通过则销毁
-				ClientSocketThread client_thread = new ClientSocketThread(client, goodsService, robotDao);
+				ClientSocketThread client_thread = new ClientSocketThread(client, goodsService, robotDao, weiXinTemplateService);
 				//启动子线程
 				client_thread.start();
 			}
@@ -129,10 +132,10 @@ public class ServerSocketThread extends Thread{
 						//如果当前时间 - 上一次收到心跳的时间 >= 3000ms
 						if((new Date().getTime() - beat.getPreDate().getTime()) >= 1000*5){ //秒	
 							if(!beat.isTimeout()) { // 如果还没有设置为超时
+								System.out.println("@@货柜串口线程心跳超时，移除客户端 machineID = " + key);
 								beat.setTimeout(true);
 								beat.getClientThread().closeClient();//关闭连接socket和释放线程
-								// it.remove();//从在线列表中移除
-								System.out.println("@@货柜串口线程心跳超时，移除客户端 machineID = " + key);
+								// it.remove();//从在线列表中移除								
 							}
 						}
 					}
