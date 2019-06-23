@@ -85,7 +85,7 @@ public class GoodsDaoImpl extends BaseDaoImpl implements GoodsDao {
 	public List<Goods> getAllGoods() {
 		return (List<Goods>) findByHql("from Goods");
 	}
-
+	
 	@Override
 	public void saveOrder(Orders order) {
 		save(order);
